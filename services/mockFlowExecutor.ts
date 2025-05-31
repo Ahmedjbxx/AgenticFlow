@@ -92,11 +92,11 @@ const executeHttpRequest = async (config: HttpRequestConfig): Promise<HttpRespon
     
     // Handle different types of errors
     if (error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${config.timeout}ms`);
+      throw new Error(`Request timeout after ${config.timeout}ms (took ${responseTime}ms)`);
     } else if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error(`Network error: ${error.message}. Check CORS settings or network connectivity.`);
+      throw new Error(`Network error after ${responseTime}ms: ${error.message}. Check CORS settings or network connectivity.`);
     } else {
-      throw new Error(`HTTP request failed: ${error.message}`);
+      throw new Error(`HTTP request failed after ${responseTime}ms: ${error.message}`);
     }
   }
 };
@@ -119,7 +119,7 @@ export const executeFlow = async (
   onLog: (logEntry: ExecutionLogEntry) => void,
   llmApiCall: (prompt: string) => Promise<string>
 ): Promise<void> => {
-  const { nodes, edges } = flow;
+  const { nodes, edges }: { nodes: CustomNode[]; edges: CustomEdge[] } = flow;
   let currentNode: CustomNode | undefined = nodes.find(n => n.data.type === CustomNodeType.TRIGGER);
   let currentInput: any = triggerInput;
 

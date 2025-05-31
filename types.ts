@@ -1,5 +1,8 @@
 import { XYPosition, Node as RFNode, Edge as RFEdge } from 'reactflow';
 
+// Re-export XYPosition for use throughout the application
+export type Position = XYPosition;
+
 export enum CustomNodeType {
   TRIGGER = 'triggerNode',
   LLM_AGENT = 'llmAgentNode',
@@ -99,7 +102,11 @@ export type CustomEdge = RFEdge;
 export interface FlowData {
   nodes: CustomNode[];
   edges: CustomEdge[];
-  viewport?: any;
+  viewport?: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
 }
 
 export interface ExecutionLogEntry {

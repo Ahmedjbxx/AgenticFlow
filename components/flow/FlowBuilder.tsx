@@ -1,11 +1,8 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import ReactFlow, {
   Controls,
   Background,
   MiniMap,
-  addEdge,
-  useNodesState,
-  useEdgesState,
   Connection,
   Node,
   Edge,
@@ -16,12 +13,14 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { CustomNodeType, NodeData, CustomNode, CustomEdge, FlowData, ExecutionLogEntry, PredefinedTemplate, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData, LoopNodeData, HttpRequestNodeData, DataTransformNodeData, DelayNodeData, SwitchNodeData } from '../../types';
-import { GEMINI_MODEL_NAME, NODE_TYPE_META, INITIAL_PROMPT_SUGGESTION } from '../../constants';
+import { CustomNode, FlowData, PredefinedTemplate, Position } from '../../types';
 import NodeEditorPanel from './NodeEditorPanel';
 import ExecutionLogView from './ExecutionLogView';
 import { generateText } from '../../services/geminiService';
-import { executeFlow } from '../../services/mockFlowExecutor';
+// Import the plugin-based flow service instead of old executor
+import { PluginFlowService } from '../../services/PluginFlowService';
+
+// Import original beautiful custom nodes
 import {
   TriggerNode,
   LLMAgentNode,
@@ -35,199 +34,156 @@ import {
   SwitchNode,
 } from './CustomNodes';
 
+// Import new store and plugin system
+import { 
+  useFlowStore,
+  useAvailableNodeTypes,
+  useSelectedNode,
+  useIsExecuting,
+  useExecutionLogs
+} from '../../store';
+import { applicationCore } from '../../core/ApplicationCore';
+
 import { PlusIcon, SaveIcon, LoadIcon, PlayIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '../icons/EditorIcons';
 import { loadLeadQualificationTemplate, loadEmailAssistantTemplate } from '../../utils/templates';
 
-
-const nodeTypes = {
-  [CustomNodeType.TRIGGER]: TriggerNode,
-  [CustomNodeType.LLM_AGENT]: LLMAgentNode,
-  [CustomNodeType.TOOL_ACTION]: ToolActionNode,
-  [CustomNodeType.CONDITION]: ConditionNode,
-  [CustomNodeType.END]: EndNode,
-  [CustomNodeType.LOOP]: LoopNode,
-  [CustomNodeType.HTTP_REQUEST]: HttpRequestNode,
-  [CustomNodeType.DATA_TRANSFORM]: DataTransformNode,
-  [CustomNodeType.DELAY]: DelayNode,
-  [CustomNodeType.SWITCH]: SwitchNode,
-};
-
 let idCounter = 0;
-const getUniqueNodeId = (type: string) => `${type}_${idCounter++}`;
 
 const FlowBuilder: React.FC = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNode, setSelectedNode] = useState<CustomNode | null>(null);
+  // Use Zustand store instead of local state
+  const store = useFlowStore();
+  const {
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    addNode: addNodeToStore,
+    createNodeFromType,
+    refreshAvailableNodeTypes,
+    startExecution,
+    stopExecution,
+    setSelectedNode,
+    clearExecutionLogs,
+    loadFlow: loadFlowToStore,
+    resetFlow,
+    addExecutionLog,
+  } = store;
+  
+  const selectedNodeId = useSelectedNode();
+  const isExecuting = useIsExecuting();
+  const executionLogs = useExecutionLogs();
+  const availableNodeTypes = useAvailableNodeTypes();
+  
+  // Local UI state
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const [executionLog, setExecutionLog] = useState<ExecutionLogEntry[]>([]);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [showLoadOptions, setShowLoadOptions] = useState(false);
   const flowWrapperRef = useRef<HTMLDivElement>(null);
 
+  // Use original beautiful node types with plugin system data - memoized to prevent React Flow warnings
+  const nodeTypes = useMemo(() => {
+    return {
+      // Map plugin types to original beautiful node components
+      'triggerNode': TriggerNode,
+      'llmAgentNode': LLMAgentNode,
+      'toolActionNode': ToolActionNode,
+      'conditionNode': ConditionNode,
+      'endNode': EndNode,
+      'loopNode': LoopNode,
+      'httpRequestNode': HttpRequestNode,
+      'dataTransformNode': DataTransformNode,
+      'delayNode': DelayNode,
+      'switchNode': SwitchNode,
+    };
+  }, []);
+
+  // Get selected node object
+  const selectedNode = nodes.find(node => node.id === selectedNodeId) || null;
+
+  // Debug logging - only when nodes change to avoid infinite loop
+  useEffect(() => {
+    console.log('🔍 FlowBuilder Debug:', {
+      availableNodeTypes: availableNodeTypes.length,
+      nodesCount: nodes.length,
+      nodes,
+      nodeTypesKeys: Object.keys(nodeTypes).length,
+      selectedNodeId
+    });
+  }, [nodes.length, selectedNodeId]); // Only depend on nodes.length and selectedNodeId
+
+  // Initialize available node types on mount
+  useEffect(() => {
+    refreshAvailableNodeTypes();
+  }, [refreshAvailableNodeTypes]);
+
   const onConnect = useCallback(
     (params: Connection) => {
+      if (!params.source || !params.target) return;
+      
       const newEdge: Edge = { 
         ...params, 
-        id: `edge-${params.source}-${params.sourceHandle}-${params.target}-${params.targetHandle}`,
+        id: `edge-${params.source}-${params.sourceHandle || 'default'}-${params.target}-${params.targetHandle || 'default'}`,
+        source: params.source,
+        target: params.target,
         type: 'smoothstep', 
         markerEnd: { type: MarkerType.ArrowClosed, color: '#6b7280' },
         style: { strokeWidth: 2, stroke: '#6b7280' }
       };
-      setEdges((eds) => addEdge(newEdge, eds));
+      setEdges([...edges, newEdge]);
     },
-    [setEdges]
+    [edges, setEdges]
   );
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: CustomNode) => {
-    setSelectedNode(node);
-  }, []);
+    setSelectedNode(node.id);
+  }, [setSelectedNode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-  }, []);
+  }, [setSelectedNode]);
 
-  const updateNodeData = useCallback((nodeId: string, newData: Partial<NodeData>) => {
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...newData } as NodeData } : node
-      )
-    );
-    // Update selectedNode if it's the one being changed
-    setSelectedNode(prev => prev && prev.id === nodeId ? {...prev, data: {...prev.data, ...newData} as NodeData} : prev);
-  }, [setNodes]);
+  const updateNodeData = useCallback((nodeId: string, newData: any) => {
+    setNodes(nodes.map(node => 
+      node.id === nodeId 
+        ? { ...node, data: { ...node.data, ...newData } } 
+        : node
+    ));
+  }, [nodes, setNodes]);
 
-  const addNode = (type: CustomNodeType, specificData?: Partial<NodeData>) => {
-    const nodeId = getUniqueNodeId(type);
-    const position = reactFlowInstance?.screenToFlowPosition({
+  const addNode = (type: string) => {
+    console.log('🎯 Adding node of type:', type);
+    
+    const position: Position = reactFlowInstance?.screenToFlowPosition({
       x: flowWrapperRef.current ? flowWrapperRef.current.clientWidth / 2 - 100 : 250,
       y: flowWrapperRef.current ? flowWrapperRef.current.clientHeight / 3 : 100,
     }) || { x: 250, y: 100 };
 
-    let newNodeData: NodeData;
-    switch (type) {
-      case CustomNodeType.TRIGGER:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'New Trigger', 
-          triggerType: 'Manual', 
-          ...(specificData as Partial<TriggerNodeData>) 
-        } as TriggerNodeData;
-        break;
-      case CustomNodeType.LLM_AGENT:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'LLM Agent', 
-          prompt: INITIAL_PROMPT_SUGGESTION, 
-          model: GEMINI_MODEL_NAME, 
-          ...(specificData as Partial<LLMAgentNodeData>) 
-        } as LLMAgentNodeData;
-        break;
-      case CustomNodeType.TOOL_ACTION:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'Tool Action', 
-          toolName: 'Send Email', 
-          ...(specificData as Partial<ToolActionNodeData>) 
-        } as ToolActionNodeData;
-        break;
-      case CustomNodeType.CONDITION:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'Condition', 
-          conditionLogic: 'input.value > 10', 
-          ...(specificData as Partial<ConditionNodeData>) 
-        } as ConditionNodeData;
-        break;
-      case CustomNodeType.END:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'End Flow', 
-          message: 'Flow_Completed', 
-          ...(specificData as Partial<EndNodeData>) 
-        } as EndNodeData;
-        break;
-      case CustomNodeType.LOOP:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'Loop', 
-          iterateOver: 'input.items',
-          itemVariable: 'item',
-          maxIterations: 100,
-          ...(specificData as Partial<LoopNodeData>) 
-        } as LoopNodeData;
-        break;
-      case CustomNodeType.HTTP_REQUEST:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'HTTP Request', 
-          method: 'GET',
-          url: 'https://api.example.com/data',
-          timeout: 5000,
-          ...(specificData as Partial<HttpRequestNodeData>) 
-        } as HttpRequestNodeData;
-        break;
-      case CustomNodeType.DATA_TRANSFORM:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'Transform Data', 
-          transformType: 'extract',
-          transformLogic: 'return { name: input.fullName, email: input.emailAddress };',
-          outputFormat: 'json',
-          ...(specificData as Partial<DataTransformNodeData>) 
-        } as DataTransformNodeData;
-        break;
-      case CustomNodeType.DELAY:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'Delay', 
-          delayType: 'fixed',
-          duration: 1000,
-          ...(specificData as Partial<DelayNodeData>) 
-        } as DelayNodeData;
-        break;
-      case CustomNodeType.SWITCH:
-        newNodeData = { 
-          id: nodeId, 
-          type, 
-          label: 'Switch', 
-          switchExpression: 'input.category',
-          cases: [
-            { value: 'urgent', label: 'Urgent' },
-            { value: 'normal', label: 'Normal' },
-            { value: 'low', label: 'Low Priority' }
-          ],
-          defaultCase: true,
-          ...(specificData as Partial<SwitchNodeData>) 
-        } as SwitchNodeData;
-        break;
-      default:
-        // This should be unreachable if CustomNodeType is exhaustive
-        const exhaustiveCheck: never = type; 
-        throw new Error(`Unknown node type: ${exhaustiveCheck}`);
-    }
+    console.log('📍 Position calculated:', position);
 
-    const newNode: CustomNode = {
-      id: nodeId,
-      type, // This should be CustomNodeType, which is correct
-      position,
-      data: newNodeData, // newNodeData is now correctly typed
-    };
-    setNodes((nds) => nds.concat(newNode));
+    const newNode = createNodeFromType(type, position);
+    console.log('🏗️ Node created:', newNode);
+    
+    if (newNode) {
+      console.log('📥 Adding to store, current nodes count:', nodes.length);
+      addNodeToStore(newNode);
+      console.log('✅ Node added to store, new count should be:', nodes.length + 1);
+      
+      // Also log what ReactFlow will receive
+      setTimeout(() => {
+        console.log('⏱️ After timeout - nodes in store:', nodes.length);
+        console.log('⏱️ ReactFlow nodes prop:', nodes);
+      }, 100);
+    } else {
+      console.error(`❌ Failed to create node of type: ${type}`);
+    }
   };
 
   const saveFlow = () => {
     if (reactFlowInstance) {
-      const flow: FlowData = reactFlowInstance.toObject() as FlowData; // Cast is needed as toObject type is generic
+      const flow: FlowData = {
+        nodes,
+        edges,
+        viewport: reactFlowInstance.getViewport()
+      };
       const flowJson = JSON.stringify(flow, null, 2);
       // For demo, log to console and alert. In a real app, this would be sent to a backend or downloaded.
       console.log('Flow Saved:', flowJson);
@@ -254,58 +210,73 @@ const FlowBuilder: React.FC = () => {
     }
     
     if (flowToLoad && reactFlowInstance) {
-      const { nodes: loadedNodes, edges: loadedEdges, viewport } = flowToLoad;
-      setNodes(loadedNodes || []);
-      setEdges(loadedEdges || []);
-      if (viewport) {
-        reactFlowInstance.setViewport(viewport);
+      loadFlowToStore(flowToLoad);
+      if (flowToLoad.viewport) {
+        reactFlowInstance.setViewport(flowToLoad.viewport);
       }
       // Reset idCounter based on loaded nodes
       let maxId = 0;
-      loadedNodes.forEach(node => {
+      flowToLoad.nodes.forEach(node => {
         const match = node.id.match(/_(\d+)$/);
         if (match && parseInt(match[1]) > maxId) {
           maxId = parseInt(match[1]);
         }
       });
       idCounter = maxId + 1;
-      setSelectedNode(null); // Deselect any node
-      setExecutionLog([]); // Clear log
     }
     setShowLoadOptions(false);
   };
 
   const runFlow = async () => {
-    setIsExecuting(true);
-    setExecutionLog([]);
+    startExecution();
+    clearExecutionLogs();
     const currentFlow: FlowData = { nodes, edges, viewport: reactFlowInstance?.getViewport() };
     
     // For MVP, provide a mock trigger input. In a real app, this would come from the trigger.
     const triggerInput = { data: "Sample trigger data for the flow." }; 
     
-    await executeFlow(currentFlow, triggerInput, async (logEntry) => {
-      setExecutionLog((prevLog) => [...prevLog, logEntry]);
-    }, generateText); // Pass the actual Gemini service function
+    try {
+      // Use the plugin-based flow service
+      const pluginFlowService = PluginFlowService.getInstance();
+      await pluginFlowService.executeFlow(currentFlow, triggerInput, (logEntry) => {
+        // Add log entry to store
+        addExecutionLog(logEntry);
+        console.log('Execution log:', logEntry);
+      });
+    } catch (error) {
+      console.error('Flow execution failed:', error);
+      addExecutionLog({
+        nodeId: 'System',
+        nodeLabel: 'Flow Execution',
+        status: 'error',
+        message: `Flow execution failed: ${(error as Error).message}`,
+        timestamp: new Date(),
+      });
+    }
     
-    setIsExecuting(false);
+    stopExecution();
   };
   
   const clearFlow = () => {
     if (window.confirm("Are you sure you want to clear the entire flow? This cannot be undone.")) {
-      setNodes([]);
-      setEdges([]);
-      setSelectedNode(null);
-      setExecutionLog([]);
+      resetFlow();
       idCounter = 0;
     }
   };
 
-  useEffect(() => {
-    // Deselect node if it's deleted
-    if (selectedNode && !nodes.find(n => n.id === selectedNode.id)) {
-      setSelectedNode(null);
-    }
-  }, [nodes, selectedNode]);
+  // Export flow functionality using store's exportFlow method
+  const handleExportFlow = () => {
+    const flowData = store.exportFlow();
+    const flowJson = JSON.stringify(flowData, null, 2);
+    navigator.clipboard.writeText(flowJson).then(() => {
+      alert('Flow exported to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
+      // Fallback: log to console
+      console.log('Flow Export:', flowJson);
+      alert('Flow exported to console (clipboard failed)');
+    });
+  };
 
   const loadTemplate = (templateLoader: () => PredefinedTemplate) => {
     const template = templateLoader();
@@ -315,22 +286,44 @@ const FlowBuilder: React.FC = () => {
     setShowLoadOptions(false);
   };
 
+  // Get plugin metadata for UI
+  const getPluginMetadata = (type: string) => {
+    const plugin = applicationCore.nodeRegistry.get(type);
+    return plugin?.metadata || {
+      name: type,
+      color: 'bg-slate-500',
+      description: 'Unknown plugin'
+    };
+  };
+
   return (
     <div className="h-full w-full flex" ref={flowWrapperRef}>
       {/* Left Toolbar for Adding Nodes */}
       <div className="w-60 bg-slate-200 p-4 space-y-3 border-r border-slate-300 flex flex-col">
         <h3 className="text-lg font-semibold text-slate-700 mb-2">Add Nodes</h3>
-        {Object.values(CustomNodeType).map((type) => (
-          <button
-            key={type}
-            onClick={() => addNode(type)}
-            className={`w-full flex items-center space-x-2 p-2 rounded-md text-white transition-colors duration-150 ${NODE_TYPE_META[type].color} hover:opacity-90`}
-          >
-            <PlusIcon className="w-5 h-5" />
-            <span>{NODE_TYPE_META[type].name}</span>
-          </button>
-        ))}
+        {availableNodeTypes.map((type) => {
+          const metadata = getPluginMetadata(type);
+          return (
+            <button
+              key={type}
+              onClick={() => addNode(type)}
+              className={`w-full flex items-center space-x-2 p-2 rounded-md text-white transition-colors duration-150 ${metadata.color} hover:opacity-90`}
+              title={metadata.description}
+            >
+              <PlusIcon className="w-5 h-5" />
+              <span>{metadata.name}</span>
+            </button>
+          );
+        })}
         <div className="pt-4 mt-auto space-y-3">
+          <button
+            onClick={handleExportFlow}
+            className="w-full flex items-center justify-center space-x-2 p-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-150"
+            title="Export Flow"
+          >
+            <SaveIcon className="w-5 h-5" />
+            <span>Export</span>
+          </button>
           <button
             onClick={clearFlow}
             className="w-full flex items-center justify-center space-x-2 p-2 rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors duration-150"
@@ -347,8 +340,30 @@ const FlowBuilder: React.FC = () => {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={(changes) => {
+            // Let ReactFlow handle internal changes, but sync important ones to store
+            changes.forEach(change => {
+              if (change.type === 'position' && change.position && change.id) {
+                // Update node position in store
+                const node = nodes.find(n => n.id === change.id);
+                if (node) {
+                  // Use store's updateNode method instead of replacing entire array
+                  store.updateNode(change.id, { position: change.position });
+                }
+              } else if (change.type === 'remove' && change.id) {
+                // Remove node from store
+                store.removeNode(change.id);
+              }
+            });
+          }}
+          onEdgesChange={(changes) => {
+            // Handle edge changes
+            changes.forEach(change => {
+              if (change.type === 'remove' && change.id) {
+                store.removeEdge(change.id);
+              }
+            });
+          }}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
@@ -361,7 +376,14 @@ const FlowBuilder: React.FC = () => {
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#cbd5e1" />
           <Controls className="react-flow__controls_custom !bg-white !shadow-lg !border !border-slate-300" />
-          <MiniMap nodeColor={(node: Node<NodeData>) => NODE_TYPE_META[node.data.type as CustomNodeType]?.color || '#e2e8f0'} nodeStrokeWidth={3} className="!border !border-slate-300" />
+          <MiniMap 
+            nodeColor={(node: Node) => {
+              const metadata = getPluginMetadata(node.type || 'unknown');
+              return metadata.color.replace('bg-', '#') || '#e2e8f0';
+            }} 
+            nodeStrokeWidth={3} 
+            className="!border !border-slate-300" 
+          />
           
           <Panel position="top-left" className="!m-0 !p-0">
              <div className="p-2 space-x-2 bg-slate-800 rounded-br-lg shadow-lg">
@@ -416,7 +438,7 @@ const FlowBuilder: React.FC = () => {
       )}
 
       {/* Bottom Execution Log */}
-      <ExecutionLogView log={executionLog} />
+      <ExecutionLogView log={executionLogs} />
     </div>
   );
 };
