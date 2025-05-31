@@ -1,0 +1,5 @@
+{
+  "name": "Universal Agentic Automation System",
+  "description": "A web application for building, visualizing, and executing automated workflows using a visual flow builder. Integrates with LLMs like Gemini for intelligent task processing.",
+  "requestFramePermissions": []
+}
