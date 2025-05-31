@@ -1,4 +1,3 @@
-
 import { XYPosition, Node as RFNode, Edge as RFEdge } from 'reactflow';
 
 export enum CustomNodeType {
@@ -7,6 +6,11 @@ export enum CustomNodeType {
   TOOL_ACTION = 'toolActionNode',
   CONDITION = 'conditionNode',
   END = 'endNode',
+  LOOP = 'loopNode',
+  HTTP_REQUEST = 'httpRequestNode',
+  DATA_TRANSFORM = 'dataTransformNode',
+  DELAY = 'delayNode',
+  SWITCH = 'switchNode',
 }
 
 export interface BaseNodeData {
@@ -45,7 +49,48 @@ export interface EndNodeData extends BaseNodeData {
   message: string;
 }
 
-export type NodeData = TriggerNodeData | LLMAgentNodeData | ToolActionNodeData | ConditionNodeData | EndNodeData;
+export interface LoopNodeData extends BaseNodeData {
+  type: CustomNodeType.LOOP;
+  iterateOver: string; // e.g., "input.items" - what array to loop over
+  itemVariable: string; // e.g., "item" - variable name for current item
+  maxIterations?: number; // Optional limit to prevent infinite loops
+}
+
+export interface HttpRequestNodeData extends BaseNodeData {
+  type: CustomNodeType.HTTP_REQUEST;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  url: string; // Can include variables like {input.endpoint}
+  headers?: Record<string, string>;
+  body?: string; // JSON string or template
+  timeout?: number; // Request timeout in milliseconds
+}
+
+export interface DataTransformNodeData extends BaseNodeData {
+  type: CustomNodeType.DATA_TRANSFORM;
+  transformType: 'extract' | 'format' | 'parse' | 'filter' | 'custom';
+  transformLogic: string; // JavaScript transformation logic
+  outputFormat?: 'json' | 'csv' | 'text' | 'array';
+}
+
+export interface DelayNodeData extends BaseNodeData {
+  type: CustomNodeType.DELAY;
+  delayType: 'fixed' | 'dynamic' | 'until';
+  duration?: number; // milliseconds for fixed delay
+  durationExpression?: string; // e.g., "input.waitTime" for dynamic
+  untilCondition?: string; // e.g., "input.ready === true" for conditional wait
+}
+
+export interface SwitchNodeData extends BaseNodeData {
+  type: CustomNodeType.SWITCH;
+  switchExpression: string; // e.g., "input.category"
+  cases: Array<{
+    value: string; // e.g., "urgent", "normal", "low"
+    label: string; // Display label for the case
+  }>;
+  defaultCase?: boolean; // Whether to include a default case
+}
+
+export type NodeData = TriggerNodeData | LLMAgentNodeData | ToolActionNodeData | ConditionNodeData | EndNodeData | LoopNodeData | HttpRequestNodeData | DataTransformNodeData | DelayNodeData | SwitchNodeData;
 
 // Override React Flow Node to use our specific data types
 export type CustomNode = RFNode<NodeData>;

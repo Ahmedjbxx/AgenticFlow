@@ -1,9 +1,8 @@
-
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { NodeData, CustomNodeType, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData } from '../../types';
+import { NodeData, CustomNodeType, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData, LoopNodeData, HttpRequestNodeData, DataTransformNodeData, DelayNodeData, SwitchNodeData } from '../../types';
 import { NODE_TYPE_META } from '../../constants';
-import { TriggerIcon, LLMIcon, ToolIcon, ConditionIcon, EndIcon, CogIcon } from '../icons/NodeIcons';
+import { TriggerIcon, LLMIcon, ToolIcon, ConditionIcon, EndIcon, CogIcon, LoopIcon, HttpIcon, TransformIcon, DelayIcon, SwitchIcon } from '../icons/NodeIcons';
 
 const iconMap: Record<CustomNodeType, React.FC<{ className?: string }>> = {
   [CustomNodeType.TRIGGER]: TriggerIcon,
@@ -11,6 +10,11 @@ const iconMap: Record<CustomNodeType, React.FC<{ className?: string }>> = {
   [CustomNodeType.TOOL_ACTION]: ToolIcon,
   [CustomNodeType.CONDITION]: ConditionIcon,
   [CustomNodeType.END]: EndIcon,
+  [CustomNodeType.LOOP]: LoopIcon,
+  [CustomNodeType.HTTP_REQUEST]: HttpIcon,
+  [CustomNodeType.DATA_TRANSFORM]: TransformIcon,
+  [CustomNodeType.DELAY]: DelayIcon,
+  [CustomNodeType.SWITCH]: SwitchIcon,
 };
 
 interface BaseNodeProps extends NodeProps<NodeData> {
@@ -33,6 +37,11 @@ const BaseNode: React.FC<BaseNodeProps> = memo(({ data, selected, type /*, child
         {data.type === CustomNodeType.TOOL_ACTION && <p>Tool: {(data as ToolActionNodeData).toolName}</p>}
         {data.type === CustomNodeType.CONDITION && <p className="truncate" title={(data as ConditionNodeData).conditionLogic}>Logic: {(data as ConditionNodeData).conditionLogic.substring(0,30)}...</p>}
         {data.type === CustomNodeType.END && <p>Message: {(data as EndNodeData).message}</p>}
+        {data.type === CustomNodeType.LOOP && <p>Iterate: {(data as LoopNodeData).iterateOver}</p>}
+        {data.type === CustomNodeType.HTTP_REQUEST && <p>{(data as HttpRequestNodeData).method} {(data as HttpRequestNodeData).url.substring(0,20)}...</p>}
+        {data.type === CustomNodeType.DATA_TRANSFORM && <p>Type: {(data as DataTransformNodeData).transformType}</p>}
+        {data.type === CustomNodeType.DELAY && <p>Mode: {(data as DelayNodeData).delayType}</p>}
+        {data.type === CustomNodeType.SWITCH && <p>Cases: {(data as SwitchNodeData).cases.length}</p>}
       </div>
       
       {/* Input Handle (except for Trigger) */}
@@ -46,7 +55,7 @@ const BaseNode: React.FC<BaseNodeProps> = memo(({ data, selected, type /*, child
       )}
 
       {/* Output Handles */}
-      {data.type !== CustomNodeType.END && data.type !== CustomNodeType.CONDITION && (
+      {data.type !== CustomNodeType.END && data.type !== CustomNodeType.CONDITION && data.type !== CustomNodeType.SWITCH && (
         <Handle
           type="source"
           position={Position.Right}
@@ -72,6 +81,45 @@ const BaseNode: React.FC<BaseNodeProps> = memo(({ data, selected, type /*, child
           />
         </>
       )}
+      {data.type === CustomNodeType.SWITCH && (
+        <>
+          {(data as SwitchNodeData).cases.map((switchCase, index) => (
+            <Handle
+              key={`switch_${switchCase.value}`}
+              type="source"
+              position={Position.Right}
+              id={`output_${switchCase.value}`}
+              style={{ top: `${20 + (index * 60 / (data as SwitchNodeData).cases.length)}%` }}
+              className="!bg-blue-500 !w-3 !h-3"
+            />
+          ))}
+          {(data as SwitchNodeData).defaultCase && (
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="output_default"
+              style={{ top: '80%' }}
+              className="!bg-gray-500 !w-3 !h-3"
+            />
+          )}
+        </>
+      )}
+      {data.type === CustomNodeType.LOOP && (
+        <>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="output_main"
+            className="!bg-slate-500 !w-3 !h-3"
+          />
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="output_loop"
+            className="!bg-indigo-500 !w-3 !h-3"
+          />
+        </>
+      )}
     </div>
   );
 });
@@ -82,5 +130,10 @@ export const LLMAgentNode: React.FC<NodeProps<LLMAgentNodeData>> = (props) => <B
 export const ToolActionNode: React.FC<NodeProps<ToolActionNodeData>> = (props) => <BaseNode {...props} />;
 export const ConditionNode: React.FC<NodeProps<ConditionNodeData>> = (props) => <BaseNode {...props} />;
 export const EndNode: React.FC<NodeProps<EndNodeData>> = (props) => <BaseNode {...props} />;
+export const LoopNode: React.FC<NodeProps<LoopNodeData>> = (props) => <BaseNode {...props} />;
+export const HttpRequestNode: React.FC<NodeProps<HttpRequestNodeData>> = (props) => <BaseNode {...props} />;
+export const DataTransformNode: React.FC<NodeProps<DataTransformNodeData>> = (props) => <BaseNode {...props} />;
+export const DelayNode: React.FC<NodeProps<DelayNodeData>> = (props) => <BaseNode {...props} />;
+export const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => <BaseNode {...props} />;
 
     
