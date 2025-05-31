@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
   Controls,
@@ -17,7 +16,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { CustomNodeType, NodeData, CustomNode, CustomEdge, FlowData, ExecutionLogEntry, PredefinedTemplate, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData } from '../../types';
+import { CustomNodeType, NodeData, CustomNode, CustomEdge, FlowData, ExecutionLogEntry, PredefinedTemplate, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData, LoopNodeData, HttpRequestNodeData, DataTransformNodeData, DelayNodeData, SwitchNodeData } from '../../types';
 import { GEMINI_MODEL_NAME, NODE_TYPE_META, INITIAL_PROMPT_SUGGESTION } from '../../constants';
 import NodeEditorPanel from './NodeEditorPanel';
 import ExecutionLogView from './ExecutionLogView';
@@ -29,6 +28,11 @@ import {
   ToolActionNode,
   ConditionNode,
   EndNode,
+  LoopNode,
+  HttpRequestNode,
+  DataTransformNode,
+  DelayNode,
+  SwitchNode,
 } from './CustomNodes';
 
 import { PlusIcon, SaveIcon, LoadIcon, PlayIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '../icons/EditorIcons';
@@ -41,6 +45,11 @@ const nodeTypes = {
   [CustomNodeType.TOOL_ACTION]: ToolActionNode,
   [CustomNodeType.CONDITION]: ConditionNode,
   [CustomNodeType.END]: EndNode,
+  [CustomNodeType.LOOP]: LoopNode,
+  [CustomNodeType.HTTP_REQUEST]: HttpRequestNode,
+  [CustomNodeType.DATA_TRANSFORM]: DataTransformNode,
+  [CustomNodeType.DELAY]: DelayNode,
+  [CustomNodeType.SWITCH]: SwitchNode,
 };
 
 let idCounter = 0;
@@ -142,6 +151,64 @@ const FlowBuilder: React.FC = () => {
           message: 'Flow_Completed', 
           ...(specificData as Partial<EndNodeData>) 
         } as EndNodeData;
+        break;
+      case CustomNodeType.LOOP:
+        newNodeData = { 
+          id: nodeId, 
+          type, 
+          label: 'Loop', 
+          iterateOver: 'input.items',
+          itemVariable: 'item',
+          maxIterations: 100,
+          ...(specificData as Partial<LoopNodeData>) 
+        } as LoopNodeData;
+        break;
+      case CustomNodeType.HTTP_REQUEST:
+        newNodeData = { 
+          id: nodeId, 
+          type, 
+          label: 'HTTP Request', 
+          method: 'GET',
+          url: 'https://api.example.com/data',
+          timeout: 5000,
+          ...(specificData as Partial<HttpRequestNodeData>) 
+        } as HttpRequestNodeData;
+        break;
+      case CustomNodeType.DATA_TRANSFORM:
+        newNodeData = { 
+          id: nodeId, 
+          type, 
+          label: 'Transform Data', 
+          transformType: 'extract',
+          transformLogic: 'return { name: input.fullName, email: input.emailAddress };',
+          outputFormat: 'json',
+          ...(specificData as Partial<DataTransformNodeData>) 
+        } as DataTransformNodeData;
+        break;
+      case CustomNodeType.DELAY:
+        newNodeData = { 
+          id: nodeId, 
+          type, 
+          label: 'Delay', 
+          delayType: 'fixed',
+          duration: 1000,
+          ...(specificData as Partial<DelayNodeData>) 
+        } as DelayNodeData;
+        break;
+      case CustomNodeType.SWITCH:
+        newNodeData = { 
+          id: nodeId, 
+          type, 
+          label: 'Switch', 
+          switchExpression: 'input.category',
+          cases: [
+            { value: 'urgent', label: 'Urgent' },
+            { value: 'normal', label: 'Normal' },
+            { value: 'low', label: 'Low Priority' }
+          ],
+          defaultCase: true,
+          ...(specificData as Partial<SwitchNodeData>) 
+        } as SwitchNodeData;
         break;
       default:
         // This should be unreachable if CustomNodeType is exhaustive
