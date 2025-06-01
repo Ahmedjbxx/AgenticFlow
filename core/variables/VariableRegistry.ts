@@ -1,5 +1,4 @@
 import { FlowData, CustomNode, CustomEdge } from '../../types';
-import { NodePlugin } from '../../nodes/base/NodePlugin';
 import { EventBus } from '../events/EventBus';
 import { DynamicVariableDefinition, NestedVariableExtractor } from './NestedVariableExtractor';
 
@@ -144,6 +143,9 @@ export class VariableRegistry {
     const reachableNodes = this.findReachableNodes(targetNodeId, flow);
 
     for (const node of reachableNodes) {
+      // Skip nodes without a type
+      if (!node.type) continue;
+      
       // Add static schema variables
       const schema = this.nodeOutputSchemas.get(node.type);
       if (schema) {

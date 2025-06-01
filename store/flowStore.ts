@@ -187,9 +187,20 @@ export const useFlowStore = create<FlowStore>()(
     },
 
     // Plugin system
-    refreshAvailableNodeTypes: () => {
+    refreshAvailableNodeTypes: async () => {
       const { nodeRegistry } = get();
+      
+      // Initialize plugin system if not already done
+      try {
+        const { pluginFlowService } = await import('../services/PluginFlowService');
+        await pluginFlowService.initialize();
+        console.log('🔌 Plugin system initialized successfully');
+      } catch (error) {
+        console.error('❌ Failed to initialize plugin system:', error);
+      }
+      
       const types = nodeRegistry.getAllTypes();
+      console.log('🎯 Available node types:', types);
       set({ availableNodeTypes: types });
     },
 

@@ -14,7 +14,7 @@ export { EventBus } from './events/EventBus';
 export { Logger, LogLevel, LogEntry } from './logging/Logger';
 
 // Base node plugin system
-export { NodePlugin, NodePluginMetadata, NodePluginRegistration } from '../nodes/base/NodePlugin';
+export { NodePlugin, NodePluginMetadata, NodePluginRegistration } from '@agenticflow/nodes';
 
 // Configuration system
 export { ConfigManager, configManager, createConfig, validateConfig } from '../config/AppConfig'; 

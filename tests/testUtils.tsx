@@ -6,7 +6,7 @@ import { NodeRegistry } from '../core/registry/NodeRegistry';
 import { EventBus } from '../core/events/EventBus';
 import { Logger } from '../core/logging/Logger';
 import { ExecutionContext } from '../core/execution/ExecutionContext';
-import { NodePlugin } from '../nodes/base/NodePlugin';
+import { NodePlugin } from '@agenticflow/nodes';
 import { FlowData, CustomNode } from '../types';
 
 // Mock implementations for testing

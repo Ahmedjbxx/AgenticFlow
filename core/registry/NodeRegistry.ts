@@ -1,4 +1,4 @@
-import { NodePlugin, NodePluginRegistration, NodePluginMetadata } from '../../nodes/base/NodePlugin';
+import { NodePlugin, NodePluginRegistration, NodePluginMetadata } from '@agenticflow/nodes';
 import { EventBus } from '../execution/ExecutionContext';
 import { VariableRegistry } from '../variables/VariableRegistry';
 

@@ -120,7 +120,16 @@ const FlowBuilder: React.FC = () => {
 
   // Initialize available node types on mount
   useEffect(() => {
-    refreshAvailableNodeTypes();
+    const initializePlugins = async () => {
+      try {
+        await refreshAvailableNodeTypes();
+        console.log('🎯 Plugin system initialized and node types refreshed');
+      } catch (error) {
+        console.error('❌ Failed to initialize plugins:', error);
+      }
+    };
+    
+    initializePlugins();
   }, [refreshAvailableNodeTypes]);
 
   const onConnect = useCallback(

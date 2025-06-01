@@ -86,6 +86,7 @@
     "typescript": "catalog:"
   },
   "dependencies": {
+    "@agenticflow/nodes": "workspace:*",
     "@google/genai": "catalog:",
     "@types/react-mentions": "^4.4.1",
     "react": "catalog:",

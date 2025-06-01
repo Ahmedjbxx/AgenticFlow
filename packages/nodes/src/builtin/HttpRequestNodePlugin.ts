@@ -98,7 +98,7 @@ export class HttpRequestNodePlugin extends NodePlugin<HttpRequestNodeData> {
         processedBody = context.replaceVariables(data.body, input);
         
         // Validate JSON if body is provided
-        if (processedBody.trim().startsWith('{') || processedBody.trim().startsWith('[')) {
+        if (processedBody && (processedBody.trim().startsWith('{') || processedBody.trim().startsWith('['))) {
           try {
             JSON.parse(processedBody); // Validate JSON syntax
           } catch (jsonError) {

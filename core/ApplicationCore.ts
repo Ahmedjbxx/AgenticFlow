@@ -3,7 +3,6 @@ import { EventBus } from './events/EventBus';
 import { Logger } from './logging/Logger';
 import { configManager } from '../config/AppConfig';
 import { ExecutionContext } from './execution/ExecutionContext';
-import { registerBuiltInPlugins } from '../nodes/builtin';
 import { VariableRegistry } from './variables/VariableRegistry';
 
 /**
@@ -25,29 +24,7 @@ export class ApplicationCore {
     this.nodeRegistry = new NodeRegistry(this.eventBus, this.variableRegistry);
     
     this.setupEventListeners();
-    this.initializePlugins();
     this.logger.info('Application core initialized');
-  }
-
-  /**
-   * Initialize built-in plugins
-   */
-  private initializePlugins(): void {
-    try {
-      this.logger.info('Registering built-in plugins...');
-      registerBuiltInPlugins(this.nodeRegistry);
-      
-      const stats = this.nodeRegistry.getStats();
-      this.logger.info(`Built-in plugins registered successfully`, stats);
-      
-      this.eventBus.emit('plugins.initialized', {
-        totalPlugins: stats.total,
-        enabledPlugins: stats.enabled,
-        categories: stats.byCategory,
-      });
-    } catch (error) {
-      this.logger.error('Failed to register built-in plugins', error as Error);
-    }
   }
 
   /**
