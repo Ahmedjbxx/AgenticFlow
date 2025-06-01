@@ -5,7 +5,14 @@ export { ApplicationCore } from './ApplicationCore';
 export { EventBus, type IEventBus } from './events/EventBus';
 
 // Logging system
-export { Logger, type ILogger, type LogLevel, type LogEntry } from './logging/Logger';
+export { 
+  Logger, 
+  ConfigurableLogger,
+  LoggerFactory,
+  type ILogger, 
+  type LogLevel, 
+  type LogEntry 
+} from './logging/Logger';
 
 // Execution context
 export { type ExecutionContext, type AppConfig } from './execution/ExecutionContext';

@@ -131,6 +131,15 @@ export class ApplicationCore {
             autoSave: true,
             debugMode: false,
           },
+          logging: {
+            level: 'info' as const,
+            maxLogs: 1000,
+            enableConsole: true,
+            enableFileOutput: false,
+            enableRemoteLogging: false,
+            structuredLogging: true,
+            includeStackTrace: true,
+          },
         }, // Temporary config until config package is ready
       },
       replaceVariables: (template: string, variables: any) => {

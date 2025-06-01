@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
+  ],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "references": [
+    {
+      "path": "../types"
+    },
+    {
+      "path": "../core"
+    }
+  ]
+} 

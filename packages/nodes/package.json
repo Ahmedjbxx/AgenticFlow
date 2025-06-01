@@ -1,7 +1,7 @@
 {
-  "name": "@agenticflow/core",
+  "name": "@agenticflow/nodes",
   "version": "0.1.0",
-  "description": "Core business logic for AgenticFlow",
+  "description": "Node plugin system for AgenticFlow",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -12,16 +12,24 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@agenticflow/types": "workspace:*",
-    "@agenticflow/config": "workspace:*"
+    "@agenticflow/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.1.0"
   },
   "devDependencies": {
+    "react": "^19.1.0",
+    "@types/react": "^19.1.6",
+    "@types/node": "^22.14.0",
     "typescript": "^5.7.2",
     "rimraf": "^6.0.1",
-    "@types/node": "^22.14.0"
+    "jest": "^29.6.2",
+    "@types/jest": "^29.5.3"
   },
   "publishConfig": {
     "access": "public"
@@ -29,13 +37,13 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Ahmedjbxx/AgenticFlow.git",
-    "directory": "packages/core"
+    "directory": "packages/nodes"
   },
   "keywords": [
     "agenticflow",
-    "core",
-    "business-logic",
-    "workflow-engine"
+    "nodes",
+    "plugins",
+    "workflow-nodes"
   ],
   "license": "MIT"
-}
+} 

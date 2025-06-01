@@ -1,5 +1,6 @@
 import type { IEventBus } from '../events/EventBus';
 import type { ILogger } from '../logging/Logger';
+import type { AppConfig } from '@agenticflow/config';
 
 export interface ExecutionContext {
   flowId: string;
@@ -24,19 +25,5 @@ export interface ExecutionContext {
   setNodeOutput: (nodeId: string, output: any) => void;
 }
 
-export interface AppConfig {
-  execution: {
-    defaultTimeout: number;
-    maxIterations: number;
-    retryAttempts: number;
-  };
-  api: {
-    geminiApiKey: string;
-    defaultModel: string;
-  };
-  ui: {
-    theme: 'light' | 'dark';
-    autoSave: boolean;
-    debugMode: boolean;
-  };
-} 
+// Re-export AppConfig for convenience
+export type { AppConfig } from '@agenticflow/config'; 

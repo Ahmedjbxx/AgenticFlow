@@ -1,7 +1,7 @@
 {
-  "name": "@agenticflow/core",
+  "name": "@agenticflow/config",
   "version": "0.1.0",
-  "description": "Core business logic for AgenticFlow",
+  "description": "Configuration management for AgenticFlow",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -15,8 +15,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@agenticflow/types": "workspace:*",
-    "@agenticflow/config": "workspace:*"
+    "@agenticflow/types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
@@ -29,13 +28,13 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Ahmedjbxx/AgenticFlow.git",
-    "directory": "packages/core"
+    "directory": "packages/config"
   },
   "keywords": [
     "agenticflow",
-    "core",
-    "business-logic",
-    "workflow-engine"
+    "configuration",
+    "environment",
+    "config-management"
   ],
   "license": "MIT"
-}
+} 
