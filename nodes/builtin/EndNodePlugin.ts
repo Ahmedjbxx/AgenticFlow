@@ -2,16 +2,17 @@ import React from 'react';
 import { NodePlugin, NodePluginMetadata } from '../base/NodePlugin';
 import { ExecutionContext } from '../../core/execution/ExecutionContext';
 import { EndNodeData } from '../../types';
+import { VariableDefinition } from '../../core/variables/VariableRegistry';
 
 export class EndNodePlugin extends NodePlugin<EndNodeData> {
   readonly metadata: NodePluginMetadata = {
     type: 'endNode',
     name: 'End',
-    description: 'End point for workflow execution',
+    description: 'Terminate workflow execution with final results',
     version: '1.0.0',
     category: 'utility',
     icon: 'EndIcon',
-    color: 'bg-rose-500',
+    color: 'bg-red-500',
   };
 
   createDefaultData(): EndNodeData {
@@ -21,6 +22,29 @@ export class EndNodePlugin extends NodePlugin<EndNodeData> {
       label: 'End',
       message: 'Workflow completed successfully',
     };
+  }
+
+  getOutputSchema(): VariableDefinition[] {
+    return [
+      {
+        name: 'workflowResult',
+        type: 'object',
+        description: 'Final result of the workflow execution',
+        example: { status: 'completed', message: 'Workflow completed successfully' }
+      },
+      {
+        name: 'completedAt',
+        type: 'string',
+        description: 'Timestamp when the workflow completed',
+        example: '2024-01-01T12:00:00.000Z'
+      },
+      {
+        name: 'finalMessage',
+        type: 'string',
+        description: 'Final message from the workflow',
+        example: 'Workflow completed successfully'
+      }
+    ];
   }
 
   async execute(input: any, data: EndNodeData, context: ExecutionContext): Promise<any> {
@@ -63,7 +87,7 @@ export class EndNodePlugin extends NodePlugin<EndNodeData> {
     return output;
   }
 
-  renderEditor(data: EndNodeData, onChange: (data: EndNodeData) => void): React.ReactNode {
+  renderEditor(data: EndNodeData, onChange: (data: EndNodeData) => void, context?: { nodeId: string; availableVariables: any[] }): React.ReactNode {
     return React.createElement('div', { className: 'space-y-4' }, [
       React.createElement('div', { key: 'message' }, [
         React.createElement('label', {

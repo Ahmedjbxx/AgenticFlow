@@ -3,6 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { CustomNode, CustomEdge, FlowData, ExecutionLogEntry, Position } from '../types';
 import { NodeRegistry } from '../core/registry/NodeRegistry';
 import { applicationCore } from '../core/ApplicationCore';
+import { AvailableVariable } from '../core/variables/VariableRegistry';
 
 // Store state interface
 interface FlowState {
@@ -14,6 +15,9 @@ interface FlowState {
   // Plugin system
   nodeRegistry: NodeRegistry;
   availableNodeTypes: string[];
+  
+  // Variable system
+  availableVariables: Map<string, AvailableVariable[]>; // nodeId -> available variables
   
   // Execution state
   isExecuting: boolean;
@@ -48,6 +52,10 @@ interface FlowActions {
   // Plugin system
   refreshAvailableNodeTypes: () => void;
   createNodeFromType: (type: string, position: Position) => CustomNode | null;
+  
+  // Variable system
+  getAvailableVariablesForNode: (nodeId: string) => AvailableVariable[];
+  refreshAvailableVariables: () => void;
   
   // Execution
   startExecution: () => void;
@@ -85,6 +93,8 @@ export const useFlowStore = create<FlowStore>()(
     nodeRegistry: applicationCore.nodeRegistry,
     availableNodeTypes: [],
     
+    availableVariables: new Map(),
+    
     isExecuting: false,
     executionLogs: [],
     currentExecutingNode: null,
@@ -101,10 +111,14 @@ export const useFlowStore = create<FlowStore>()(
     // Flow operations
     setNodes: (nodes) => {
       set({ nodes, hasUnsavedChanges: true });
+      // Refresh available variables when nodes change
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     setEdges: (edges) => {
       set({ edges, hasUnsavedChanges: true });
+      // Refresh available variables when edges change (affects flow structure)
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     setViewport: (viewport) => {
@@ -118,6 +132,8 @@ export const useFlowStore = create<FlowStore>()(
         ),
         hasUnsavedChanges: true,
       }));
+      // Refresh available variables when nodes are updated
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     updateNodeData: (nodeId, data) => {
@@ -134,6 +150,8 @@ export const useFlowStore = create<FlowStore>()(
         nodes: [...state.nodes, node],
         hasUnsavedChanges: true,
       }));
+      // Refresh available variables when nodes are added
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     removeNode: (nodeId) => {
@@ -145,6 +163,8 @@ export const useFlowStore = create<FlowStore>()(
         selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
         hasUnsavedChanges: true,
       }));
+      // Refresh available variables when nodes are removed
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     addEdge: (edge) => {
@@ -152,6 +172,8 @@ export const useFlowStore = create<FlowStore>()(
         edges: [...state.edges, edge],
         hasUnsavedChanges: true,
       }));
+      // Refresh available variables when edges are added
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     removeEdge: (edgeId) => {
@@ -160,6 +182,8 @@ export const useFlowStore = create<FlowStore>()(
         selectedEdgeId: state.selectedEdgeId === edgeId ? null : state.selectedEdgeId,
         hasUnsavedChanges: true,
       }));
+      // Refresh available variables when edges are removed
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     // Plugin system
@@ -194,19 +218,41 @@ export const useFlowStore = create<FlowStore>()(
       return newNode;
     },
 
+    // Variable system
+    getAvailableVariablesForNode: (nodeId) => {
+      const { availableVariables } = get();
+      return availableVariables.get(nodeId) || [];
+    },
+
+    refreshAvailableVariables: () => {
+      const { nodes, edges } = get();
+      const { variableRegistry } = applicationCore;
+      const newAvailableVariables = new Map<string, AvailableVariable[]>();
+
+      const currentFlow: FlowData = { nodes, edges, viewport: get().viewport };
+
+      // Calculate available variables for each node
+      for (const node of nodes) {
+        const availableVars = variableRegistry.getAvailableVariablesForNode(node.id, currentFlow);
+        newAvailableVariables.set(node.id, availableVars);
+      }
+
+      set({ availableVariables: newAvailableVariables });
+    },
+
     // Execution
     startExecution: () => {
       set({ 
         isExecuting: true, 
+        currentExecutingNode: null,
         executionLogs: [],
-        currentExecutingNode: null 
       });
     },
 
     stopExecution: () => {
       set({ 
         isExecuting: false, 
-        currentExecutingNode: null 
+        currentExecutingNode: null,
       });
     },
 
@@ -226,19 +272,11 @@ export const useFlowStore = create<FlowStore>()(
 
     // UI state
     setSelectedNode: (nodeId) => {
-      set({ 
-        selectedNodeId: nodeId,
-        selectedEdgeId: null, // Clear edge selection
-        isEditorPanelOpen: nodeId !== null, // Auto-open editor when node selected
-      });
+      set({ selectedNodeId: nodeId });
     },
 
     setSelectedEdge: (edgeId) => {
-      set({ 
-        selectedEdgeId: edgeId,
-        selectedNodeId: null, // Clear node selection
-        isEditorPanelOpen: false, // Close editor for edge selection
-      });
+      set({ selectedEdgeId: edgeId });
     },
 
     setEditorPanelOpen: (open) => {
@@ -251,36 +289,42 @@ export const useFlowStore = create<FlowStore>()(
 
     // Flow management
     loadFlow: (flowData) => {
+      // Calculate unique ID counter based on existing nodes
+      let maxCounter = 0;
+      flowData.nodes.forEach(node => {
+        const match = node.id.match(/-(\d+)-/);
+        if (match) {
+          const counter = parseInt(match[1], 10);
+          if (counter > maxCounter) {
+            maxCounter = counter;
+          }
+        }
+      });
+
       set({
         nodes: flowData.nodes,
         edges: flowData.edges,
         viewport: flowData.viewport || { x: 0, y: 0, zoom: 1 },
+        hasUnsavedChanges: false,
         selectedNodeId: null,
         selectedEdgeId: null,
-        isEditorPanelOpen: false,
-        executionLogs: [],
-        currentExecutingNode: null,
-        isExecuting: false,
-        hasUnsavedChanges: false,
-        lastSaved: new Date(),
       });
+
+      // Refresh available variables after loading
+      setTimeout(() => get().refreshAvailableVariables(), 0);
     },
 
     exportFlow: () => {
       const { nodes, edges, viewport } = get();
-      return {
-        nodes,
-        edges,
-        viewport,
-      };
+      return { nodes, edges, viewport };
     },
 
     setFlowName: (name) => {
-      set({ flowName: name, hasUnsavedChanges: true });
+      set({ flowName: name });
     },
 
     markSaved: () => {
-      set({ hasUnsavedChanges: false, lastSaved: new Date() });
+      set({ lastSaved: new Date(), hasUnsavedChanges: false });
     },
 
     markUnsaved: () => {
@@ -292,27 +336,19 @@ export const useFlowStore = create<FlowStore>()(
         nodes: [],
         edges: [],
         viewport: { x: 0, y: 0, zoom: 1 },
+        availableVariables: new Map(),
         selectedNodeId: null,
         selectedEdgeId: null,
-        isEditorPanelOpen: false,
-        isLogPanelOpen: false,
+        hasUnsavedChanges: false,
         executionLogs: [],
         currentExecutingNode: null,
         isExecuting: false,
-        flowName: 'Untitled Flow',
-        hasUnsavedChanges: false,
-        lastSaved: null,
       });
     },
   }))
 );
 
-// Initialize available node types
-setTimeout(() => {
-  useFlowStore.getState().refreshAvailableNodeTypes();
-}, 0);
-
-// Selector hooks for commonly used state
+// Selector hooks for better performance
 export const useFlowNodes = () => useFlowStore(state => state.nodes);
 export const useFlowEdges = () => useFlowStore(state => state.edges);
 export const useSelectedNode = () => useFlowStore(state => state.selectedNodeId);
@@ -322,14 +358,48 @@ export const useAvailableNodeTypes = () => useFlowStore(state => state.available
 export const useFlowActions = () => useFlowStore(state => ({
   setNodes: state.setNodes,
   setEdges: state.setEdges,
-  updateNode: state.updateNode,
-  updateNodeData: state.updateNodeData,
   addNode: state.addNode,
   removeNode: state.removeNode,
+  updateNode: state.updateNode,
+  updateNodeData: state.updateNodeData,
   addEdge: state.addEdge,
   removeEdge: state.removeEdge,
   setSelectedNode: state.setSelectedNode,
   startExecution: state.startExecution,
   stopExecution: state.stopExecution,
+  refreshAvailableNodeTypes: state.refreshAvailableNodeTypes,
   createNodeFromType: state.createNodeFromType,
+  getAvailableVariablesForNode: state.getAvailableVariablesForNode,
+  refreshAvailableVariables: state.refreshAvailableVariables,
 })); 
+
+// Setup event listeners for automatic variable refresh
+(() => {
+  const { eventBus } = applicationCore;
+  
+  // Refresh variables when runtime variables are registered
+  eventBus.on('variables.runtime.registered', () => {
+    console.log('🔄 Runtime variables registered, refreshing UI...');
+    useFlowStore.getState().refreshAvailableVariables();
+  });
+
+  // Refresh variables when runtime variables are invalidated
+  eventBus.on('variables.runtime.invalidated', () => {
+    console.log('🗑️ Runtime variables invalidated, refreshing UI...');
+    useFlowStore.getState().refreshAvailableVariables();
+  });
+
+  // Refresh variables when node output is processed
+  eventBus.on('node.output.processed', () => {
+    console.log('📦 Node output processed, refreshing UI...');
+    useFlowStore.getState().refreshAvailableVariables();
+  });
+
+  // Refresh variables when runtime variables are cleared
+  eventBus.on('variables.runtime.cleared', () => {
+    console.log('🧹 Runtime variables cleared, refreshing UI...');
+    useFlowStore.getState().refreshAvailableVariables();
+  });
+
+  console.log('✅ Flow store event listeners initialized');
+})(); 

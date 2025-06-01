@@ -133,6 +133,9 @@ export class PluginBasedFlowExecutor {
         // Execute the node using its plugin
         output = await plugin.execute(currentInput, currentNode.data, context);
 
+        // ✨ CRITICAL FIX: Register the output for runtime variable extraction
+        context.setNodeOutput(currentNode.id, output);
+
         // Log successful execution
         const successLog: ExecutionLogEntry = {
           nodeId: currentNode.id,

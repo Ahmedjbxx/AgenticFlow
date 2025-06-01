@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExecutionContext } from '../../core/execution/ExecutionContext';
+import { VariableDefinition } from '../../core/variables/VariableRegistry';
 
 export interface NodePluginMetadata {
   type: string;
@@ -11,6 +12,11 @@ export interface NodePluginMetadata {
   color: string;
 }
 
+export interface NodeEditorContext {
+  nodeId: string;
+  availableVariables: any[];
+}
+
 export abstract class NodePlugin<TData = any> {
   abstract readonly metadata: NodePluginMetadata;
   
@@ -18,9 +24,12 @@ export abstract class NodePlugin<TData = any> {
   abstract createDefaultData(): TData;
   abstract execute(input: any, data: TData, context: ExecutionContext): Promise<any>;
   
-  // UI components
-  abstract renderEditor(data: TData, onChange: (data: TData) => void): React.ReactNode;
+  // UI components with optional context for variable system
+  abstract renderEditor(data: TData, onChange: (data: TData) => void, context?: NodeEditorContext): React.ReactNode;
   abstract renderNode(data: TData): React.ReactNode;
+  
+  // Variable system - declare what variables this node outputs
+  abstract getOutputSchema(): VariableDefinition[];
   
   // Optional lifecycle hooks
   onBeforeExecute?(context: ExecutionContext): Promise<void> {

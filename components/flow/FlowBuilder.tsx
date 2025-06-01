@@ -40,16 +40,24 @@ import {
   useAvailableNodeTypes,
   useSelectedNode,
   useIsExecuting,
-  useExecutionLogs
+  useExecutionLogs,
+  usePersistenceStore,
 } from '../../store';
 import { applicationCore } from '../../core/ApplicationCore';
 
 import { PlusIcon, SaveIcon, LoadIcon, PlayIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '../icons/EditorIcons';
 import { loadLeadQualificationTemplate, loadEmailAssistantTemplate } from '../../utils/templates';
 
+// Import Phase 4 Polish components
+import { ErrorBoundary } from '../ErrorBoundary';
+import { PerformanceMonitor, usePerformanceTracking } from '../performance/PerformanceMonitor';
+
 let idCounter = 0;
 
 const FlowBuilder: React.FC = () => {
+  // Performance tracking disabled to prevent infinite logging
+  // usePerformanceTracking('FlowBuilder');
+
   // Use Zustand store instead of local state
   const store = useFlowStore();
   const {
@@ -297,149 +305,154 @@ const FlowBuilder: React.FC = () => {
   };
 
   return (
-    <div className="h-full w-full flex" ref={flowWrapperRef}>
-      {/* Left Toolbar for Adding Nodes */}
-      <div className="w-60 bg-slate-200 p-4 space-y-3 border-r border-slate-300 flex flex-col">
-        <h3 className="text-lg font-semibold text-slate-700 mb-2">Add Nodes</h3>
-        {availableNodeTypes.map((type) => {
-          const metadata = getPluginMetadata(type);
-          return (
+    <ErrorBoundary>
+      <div className="h-full w-full flex" ref={flowWrapperRef}>
+        {/* Left Toolbar for Adding Nodes */}
+        <div className="w-60 bg-slate-200 p-4 space-y-3 border-r border-slate-300 flex flex-col">
+          <h3 className="text-lg font-semibold text-slate-700 mb-2">Add Nodes</h3>
+          {availableNodeTypes.map((type) => {
+            const metadata = getPluginMetadata(type);
+            return (
+              <button
+                key={type}
+                onClick={() => addNode(type)}
+                className={`w-full flex items-center space-x-2 p-2 rounded-md text-white transition-colors duration-150 ${metadata.color} hover:opacity-90`}
+                title={metadata.description}
+              >
+                <PlusIcon className="w-5 h-5" />
+                <span>{metadata.name}</span>
+              </button>
+            );
+          })}
+          <div className="pt-4 mt-auto space-y-3">
             <button
-              key={type}
-              onClick={() => addNode(type)}
-              className={`w-full flex items-center space-x-2 p-2 rounded-md text-white transition-colors duration-150 ${metadata.color} hover:opacity-90`}
-              title={metadata.description}
+              onClick={handleExportFlow}
+              className="w-full flex items-center justify-center space-x-2 p-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-150"
+              title="Export Flow"
             >
-              <PlusIcon className="w-5 h-5" />
-              <span>{metadata.name}</span>
+              <SaveIcon className="w-5 h-5" />
+              <span>Export</span>
             </button>
-          );
-        })}
-        <div className="pt-4 mt-auto space-y-3">
-          <button
-            onClick={handleExportFlow}
-            className="w-full flex items-center justify-center space-x-2 p-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-150"
-            title="Export Flow"
-          >
-            <SaveIcon className="w-5 h-5" />
-            <span>Export</span>
-          </button>
-          <button
-            onClick={clearFlow}
-            className="w-full flex items-center justify-center space-x-2 p-2 rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors duration-150"
-            title="Clear Flow"
-            >
-            <TrashIcon className="w-5 h-5" />
-            <span>Clear Flow</span>
-          </button>
+            <button
+              onClick={clearFlow}
+              className="w-full flex items-center justify-center space-x-2 p-2 rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors duration-150"
+              title="Clear Flow"
+              >
+              <TrashIcon className="w-5 h-5" />
+              <span>Clear Flow</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Center React Flow Canvas */}
-      <div className="flex-grow h-full relative bg-gradient-to-br from-slate-50 to-slate-200">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={(changes) => {
-            // Let ReactFlow handle internal changes, but sync important ones to store
-            changes.forEach(change => {
-              if (change.type === 'position' && change.position && change.id) {
-                // Update node position in store
-                const node = nodes.find(n => n.id === change.id);
-                if (node) {
-                  // Use store's updateNode method instead of replacing entire array
-                  store.updateNode(change.id, { position: change.position });
+        {/* Center React Flow Canvas */}
+        <div className="flex-grow h-full relative bg-gradient-to-br from-slate-50 to-slate-200">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={(changes) => {
+              // Let ReactFlow handle internal changes, but sync important ones to store
+              changes.forEach(change => {
+                if (change.type === 'position' && change.position && change.id) {
+                  // Update node position in store
+                  const node = nodes.find(n => n.id === change.id);
+                  if (node) {
+                    // Use store's updateNode method instead of replacing entire array
+                    store.updateNode(change.id, { position: change.position });
+                  }
+                } else if (change.type === 'remove' && change.id) {
+                  // Remove node from store
+                  store.removeNode(change.id);
                 }
-              } else if (change.type === 'remove' && change.id) {
-                // Remove node from store
-                store.removeNode(change.id);
-              }
-            });
-          }}
-          onEdgesChange={(changes) => {
-            // Handle edge changes
-            changes.forEach(change => {
-              if (change.type === 'remove' && change.id) {
-                store.removeEdge(change.id);
-              }
-            });
-          }}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
-          nodeTypes={nodeTypes}
-          onInit={setReactFlowInstance}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
-          className="bg-transparent"
-          deleteKeyCode={['Backspace', 'Delete']}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#cbd5e1" />
-          <Controls className="react-flow__controls_custom !bg-white !shadow-lg !border !border-slate-300" />
-          <MiniMap 
-            nodeColor={(node: Node) => {
-              const metadata = getPluginMetadata(node.type || 'unknown');
-              return metadata.color.replace('bg-', '#') || '#e2e8f0';
-            }} 
-            nodeStrokeWidth={3} 
-            className="!border !border-slate-300" 
-          />
-          
-          <Panel position="top-left" className="!m-0 !p-0">
-             <div className="p-2 space-x-2 bg-slate-800 rounded-br-lg shadow-lg">
-                <button
-                  onClick={saveFlow}
-                  className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-150"
-                  title="Save Flow"
-                >
-                  <SaveIcon className="w-5 h-5" />
-                </button>
-                <div className="inline-block relative">
+              });
+            }}
+            onEdgesChange={(changes) => {
+              // Handle edge changes
+              changes.forEach(change => {
+                if (change.type === 'remove' && change.id) {
+                  store.removeEdge(change.id);
+                }
+              });
+            }}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
+            nodeTypes={nodeTypes}
+            onInit={setReactFlowInstance}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            className="bg-transparent"
+            deleteKeyCode={['Backspace', 'Delete']}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#cbd5e1" />
+            <Controls className="react-flow__controls_custom !bg-white !shadow-lg !border !border-slate-300" />
+            <MiniMap 
+              nodeColor={(node: Node) => {
+                const metadata = getPluginMetadata(node.type || 'unknown');
+                return metadata.color.replace('bg-', '#') || '#e2e8f0';
+              }} 
+              nodeStrokeWidth={3} 
+              className="!border !border-slate-300" 
+            />
+            
+            <Panel position="top-left" className="!m-0 !p-0">
+               <div className="p-2 space-x-2 bg-slate-800 rounded-br-lg shadow-lg">
                   <button
-                    onClick={() => setShowLoadOptions(prev => !prev)}
-                    className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-150"
-                    title="Load Flow / Templates"
+                    onClick={saveFlow}
+                    className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors duration-150"
+                    title="Save Flow"
                   >
-                    <LoadIcon className="w-5 h-5" />
-                    {showLoadOptions ? <ChevronUpIcon className="w-4 h-4 inline ml-1" /> : <ChevronDownIcon className="w-4 h-4 inline ml-1" />}
+                    <SaveIcon className="w-5 h-5" />
                   </button>
-                  {showLoadOptions && (
-                    <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
-                      <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                        <a href="#" onClick={(e) => { e.preventDefault(); loadFlow(); }} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900" role="menuitem">Load from JSON...</a>
-                        <div className="border-t border-slate-200 my-1"></div>
-                        <p className="px-4 py-2 text-xs text-slate-500">Templates:</p>
-                        <a href="#" onClick={(e) => { e.preventDefault(); loadTemplate(loadLeadQualificationTemplate); }} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900" role="menuitem">Lead Qualification</a>
-                        <a href="#" onClick={(e) => { e.preventDefault(); loadTemplate(loadEmailAssistantTemplate); }} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900" role="menuitem">Email Assistant</a>
+                  <div className="inline-block relative">
+                    <button
+                      onClick={() => setShowLoadOptions(prev => !prev)}
+                      className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-150"
+                      title="Load Flow / Templates"
+                    >
+                      <LoadIcon className="w-5 h-5" />
+                      {showLoadOptions ? <ChevronUpIcon className="w-4 h-4 inline ml-1" /> : <ChevronDownIcon className="w-4 h-4 inline ml-1" />}
+                    </button>
+                    {showLoadOptions && (
+                      <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                          <a href="#" onClick={(e) => { e.preventDefault(); loadFlow(); }} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900" role="menuitem">Load from JSON...</a>
+                          <div className="border-t border-slate-200 my-1"></div>
+                          <p className="px-4 py-2 text-xs text-slate-500">Templates:</p>
+                          <a href="#" onClick={(e) => { e.preventDefault(); loadTemplate(loadLeadQualificationTemplate); }} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900" role="menuitem">Lead Qualification</a>
+                          <a href="#" onClick={(e) => { e.preventDefault(); loadTemplate(loadEmailAssistantTemplate); }} className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900" role="menuitem">Email Assistant</a>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <button
+                    onClick={runFlow}
+                    disabled={isExecuting}
+                    className={`p-2 rounded-md text-white transition-colors duration-150 ${isExecuting ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
+                    title="Run Flow"
+                  >
+                    <PlayIcon className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  onClick={runFlow}
-                  disabled={isExecuting}
-                  className={`p-2 rounded-md text-white transition-colors duration-150 ${isExecuting ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
-                  title="Run Flow"
-                >
-                  <PlayIcon className="w-5 h-5" />
-                </button>
-              </div>
-          </Panel>
-        </ReactFlow>
+            </Panel>
+          </ReactFlow>
+        </div>
+
+        {/* Right Node Editor Panel */}
+        {selectedNode && (
+          <NodeEditorPanel
+            node={selectedNode}
+            onUpdateNodeData={updateNodeData}
+            onClose={() => setSelectedNode(null)}
+          />
+        )}
+
+        {/* Bottom Execution Log */}
+        <ExecutionLogView log={executionLogs} />
+
+        {/* Performance Monitor (Phase 4 addition) - DISABLED to prevent infinite logging */}
+        {/* <PerformanceMonitor enabled={process.env.NODE_ENV === 'development'} /> */}
       </div>
-
-      {/* Right Node Editor Panel */}
-      {selectedNode && (
-        <NodeEditorPanel
-          node={selectedNode}
-          onUpdateNodeData={updateNodeData}
-          onClose={() => setSelectedNode(null)}
-        />
-      )}
-
-      {/* Bottom Execution Log */}
-      <ExecutionLogView log={executionLogs} />
-    </div>
+    </ErrorBoundary>
   );
 };
 

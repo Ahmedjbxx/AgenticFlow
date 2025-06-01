@@ -1,12 +1,22 @@
 import { NodePlugin, NodePluginRegistration, NodePluginMetadata } from '../../nodes/base/NodePlugin';
 import { EventBus } from '../execution/ExecutionContext';
+import { VariableRegistry } from '../variables/VariableRegistry';
 
 export class NodeRegistry {
   private plugins = new Map<string, NodePluginRegistration>();
   private eventBus: EventBus;
+  private variableRegistry?: VariableRegistry;
 
-  constructor(eventBus: EventBus) {
+  constructor(eventBus: EventBus, variableRegistry?: VariableRegistry) {
     this.eventBus = eventBus;
+    this.variableRegistry = variableRegistry;
+  }
+
+  /**
+   * Set the variable registry (for dependency injection)
+   */
+  setVariableRegistry(variableRegistry: VariableRegistry): void {
+    this.variableRegistry = variableRegistry;
   }
 
   /**
@@ -26,6 +36,16 @@ export class NodeRegistry {
     };
 
     this.plugins.set(type, registration);
+    
+    // Register output schema with variable registry
+    if (this.variableRegistry && typeof plugin.getOutputSchema === 'function') {
+      try {
+        const outputSchema = plugin.getOutputSchema();
+        this.variableRegistry.registerNodeOutputSchema(type, outputSchema);
+      } catch (error) {
+        console.warn(`Failed to register output schema for plugin ${type}:`, error);
+      }
+    }
     
     this.eventBus.emit('node.plugin.registered', {
       type,
@@ -146,6 +166,11 @@ export class NodeRegistry {
       
       if (typeof plugin.renderNode !== 'function') {
         errors.push('renderNode method is required');
+      }
+
+      // Check variable system method
+      if (typeof plugin.getOutputSchema !== 'function') {
+        errors.push('getOutputSchema method is required');
       }
 
       if (errors.length > 0) {

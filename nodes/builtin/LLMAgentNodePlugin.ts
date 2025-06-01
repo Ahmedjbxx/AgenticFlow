@@ -3,6 +3,9 @@ import { NodePlugin, NodePluginMetadata } from '../base/NodePlugin';
 import { ExecutionContext } from '../../core/execution/ExecutionContext';
 import { LLMAgentNodeData } from '../../types';
 import { generateText } from '../../services/geminiService';
+import { CustomNodeType } from '../../types';
+import { VariableDefinition } from '../../core/variables/VariableRegistry';
+import { MentionsInput } from '../../components/flow/MentionsInput';
 
 export class LLMAgentNodePlugin extends NodePlugin<LLMAgentNodeData> {
   readonly metadata: NodePluginMetadata = {
@@ -18,13 +21,41 @@ export class LLMAgentNodePlugin extends NodePlugin<LLMAgentNodeData> {
   createDefaultData(): LLMAgentNodeData {
     return {
       id: '',
-      type: 'llmAgentNode' as any,
+      type: CustomNodeType.LLM_AGENT,
       label: 'LLM Agent',
       prompt: 'Analyze the following data and provide insights: {input}',
       model: 'gemini-pro',
       temperature: 0.7,
       maxTokens: 1000,
     };
+  }
+
+  getOutputSchema(): VariableDefinition[] {
+    return [
+      {
+        name: 'llmText',
+        type: 'string',
+        description: 'Raw text response from the LLM',
+        example: 'Based on the analysis, I found that...'
+      },
+      {
+        name: 'llmResponse',
+        type: 'object',
+        description: 'Parsed response from the LLM (JSON if parseable, otherwise object with text)',
+        example: { text: 'Response text', raw: 'Raw response' }
+      },
+      {
+        name: 'llmMetadata',
+        type: 'object',
+        description: 'Metadata about the LLM execution',
+        example: {
+          model: 'gemini-pro',
+          promptLength: 150,
+          responseLength: 300,
+          processedAt: '2024-01-01T12:00:00Z'
+        }
+      }
+    ];
   }
 
   async execute(input: any, data: LLMAgentNodeData, context: ExecutionContext): Promise<any> {
@@ -48,11 +79,7 @@ export class LLMAgentNodePlugin extends NodePlugin<LLMAgentNodeData> {
       });
 
       // Call the LLM service
-      const llmResponse = await generateText(processedPrompt, {
-        model: data.model || config.api.defaultModel,
-        temperature: data.temperature,
-        maxTokens: data.maxTokens,
-      });
+      const llmResponse = await generateText(processedPrompt);
 
       // Try to parse response as JSON, otherwise treat as text
       let parsedResponse: any;
@@ -110,28 +137,20 @@ export class LLMAgentNodePlugin extends NodePlugin<LLMAgentNodeData> {
     }
   }
 
-  renderEditor(data: LLMAgentNodeData, onChange: (data: LLMAgentNodeData) => void): React.ReactNode {
+  renderEditor(data: LLMAgentNodeData, onChange: (data: LLMAgentNodeData) => void, context?: { nodeId: string; availableVariables: any[] }): React.ReactNode {
     return React.createElement('div', { className: 'space-y-4' }, [
-      // Prompt field
+      // Prompt field with mentions
       React.createElement('div', { key: 'prompt' }, [
-        React.createElement('label', {
-          key: 'prompt-label',
-          htmlFor: 'prompt',
-          className: 'block text-sm font-medium text-slate-700'
-        }, 'Prompt'),
-        React.createElement('textarea', {
-          key: 'prompt-textarea',
-          id: 'prompt',
+        React.createElement(MentionsInput, {
+          key: 'prompt-mentions',
           value: data.prompt,
-          onChange: (e: any) => onChange({ ...data, prompt: e.target.value }),
+          onChange: (value: string) => onChange({ ...data, prompt: value }),
+          availableVariables: context?.availableVariables || [],
+          label: 'Prompt Template',
+          placeholder: 'Enter your prompt here. Type { to insert variables from previous nodes.',
           rows: 6,
-          className: 'mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm',
-          placeholder: 'Enter your prompt here. Use {input.fieldName} for variables.'
-        }),
-        React.createElement('p', {
-          key: 'prompt-help',
-          className: 'mt-1 text-xs text-slate-500'
-        }, 'Use variables like {input.data} or {input.user.name} to include dynamic content')
+          helpText: 'Use variables from previous nodes to include dynamic content in your prompt.'
+        })
       ]),
       
       // Model selection

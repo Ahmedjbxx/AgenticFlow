@@ -2,6 +2,7 @@ import React from 'react';
 import { NodePlugin, NodePluginMetadata } from '../base/NodePlugin';
 import { ExecutionContext } from '../../core/execution/ExecutionContext';
 import { HttpRequestNodeData } from '../../types';
+import { VariableDefinition } from '../../core/variables/VariableRegistry';
 
 // HTTP Request interfaces (modular from existing implementation)
 interface HttpRequestConfig {
@@ -37,9 +38,39 @@ export class HttpRequestNodePlugin extends NodePlugin<HttpRequestNodeData> {
       type: 'httpRequestNode' as any,
       label: 'HTTP Request',
       method: 'GET',
-      url: 'https://api.example.com/data',
+      url: 'https://api.restful-api.dev/objects/1',
       timeout: 5000,
     };
+  }
+
+  getOutputSchema(): VariableDefinition[] {
+    return [
+      {
+        name: 'httpResponse',
+        type: 'object',
+        description: 'Complete HTTP response object with status, headers, and data',
+        example: {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+          data: { result: 'success' },
+          responseTime: 150,
+          success: true
+        }
+      },
+      {
+        name: 'responseData',
+        type: 'object',
+        description: 'Response body data (parsed JSON or raw text)',
+        example: { result: 'success', items: [1, 2, 3] }
+      },
+      {
+        name: 'responseStatus',
+        type: 'number',
+        description: 'HTTP status code',
+        example: 200
+      }
+    ];
   }
 
   async execute(input: any, data: HttpRequestNodeData, context: ExecutionContext): Promise<any> {
@@ -132,7 +163,7 @@ export class HttpRequestNodePlugin extends NodePlugin<HttpRequestNodeData> {
     }
   }
 
-  renderEditor(data: HttpRequestNodeData, onChange: (data: HttpRequestNodeData) => void): React.ReactNode {
+  renderEditor(data: HttpRequestNodeData, onChange: (data: HttpRequestNodeData) => void, context?: { nodeId: string; availableVariables: any[] }): React.ReactNode {
     return React.createElement('div', { className: 'space-y-4' }, [
       // Method selector
       React.createElement('div', { key: 'method' }, [

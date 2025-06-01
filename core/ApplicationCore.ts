@@ -4,6 +4,7 @@ import { Logger } from './logging/Logger';
 import { configManager } from '../config/AppConfig';
 import { ExecutionContext } from './execution/ExecutionContext';
 import { registerBuiltInPlugins } from '../nodes/builtin';
+import { VariableRegistry } from './variables/VariableRegistry';
 
 /**
  * Main application core that orchestrates all services
@@ -14,12 +15,14 @@ export class ApplicationCore {
   public readonly eventBus: EventBus;
   public readonly logger: Logger;
   public readonly nodeRegistry: NodeRegistry;
+  public readonly variableRegistry: VariableRegistry;
   
   private constructor() {
     // Initialize core services
     this.eventBus = new EventBus();
     this.logger = new Logger('debug', 1000);
-    this.nodeRegistry = new NodeRegistry(this.eventBus);
+    this.variableRegistry = new VariableRegistry(this.eventBus);
+    this.nodeRegistry = new NodeRegistry(this.eventBus, this.variableRegistry);
     
     this.setupEventListeners();
     this.initializePlugins();
@@ -172,12 +175,27 @@ export class ApplicationCore {
       },
       setNodeOutput: (nodeId: string, output: any) => {
         nodeOutputs.set(nodeId, output);
+        
+        // ✨ PHASE 4: Auto-extract runtime variables from node output
+        if (output && typeof output === 'object') {
+          this.variableRegistry.registerRuntimeVariables(nodeId, output);
+          
+          this.eventBus.emit('node.output.processed', {
+            nodeId,
+            hasOutput: !!output,
+            outputType: typeof output,
+            timestamp: Date.now(),
+          });
+        } else {
+          // Clear runtime variables if output is not an object
+          this.variableRegistry.invalidateRuntimeVariables(nodeId);
+        }
       },
     };
   }
 
   /**
-   * Replace variables in templates
+   * Enhanced variable replacement that supports node output references
    */
   private replaceVariables(template: string, variables: any): string {
     if (!variables || typeof variables !== 'object') {
@@ -185,14 +203,89 @@ export class ApplicationCore {
     }
 
     return template.replace(/\{([^}]+)\}/g, (match, path) => {
+      // Handle node output references (e.g., {node_123.llmText})
+      if (path.includes('.')) {
+        const [nodeId, variableName] = path.split('.', 2);
+        
+        // Check if this is a node output reference
+        if (variables.nodeOutputs && variables.nodeOutputs[nodeId]) {
+          const nodeOutput = variables.nodeOutputs[nodeId];
+          if (nodeOutput && typeof nodeOutput === 'object' && variableName in nodeOutput) {
+            return String(nodeOutput[variableName]);
+          }
+        }
+      }
+
+      // ✨ Enhanced nested path resolution for flat input structures
       const keys = path.split('.');
       let value = variables;
       
-      for (const key of keys) {
-        if (value && typeof value === 'object' && key in value) {
-          value = value[key];
+      // ✨ CRITICAL FIX: Handle node ID prefixed paths
+      // If first key looks like a node ID and doesn't exist, try without the node ID prefix
+      if (keys.length > 1 && keys[0].includes('-') && !(keys[0] in variables)) {
+        // Try resolving the path without the node ID prefix
+        const pathWithoutNodeId = keys.slice(1);
+        let valueWithoutPrefix = variables;
+        
+        for (let i = 0; i < pathWithoutNodeId.length; i++) {
+          const key = pathWithoutNodeId[i];
+          
+          if (valueWithoutPrefix && typeof valueWithoutPrefix === 'object') {
+            if (key in valueWithoutPrefix) {
+              valueWithoutPrefix = valueWithoutPrefix[key];
+            } else {
+              break; // Exit early, will fall back to original path
+            }
+          } else {
+            break; // Not an object, can't traverse further
+          }
+        }
+        
+        // If we successfully resolved the path without node ID, return it
+        if (pathWithoutNodeId.length > 0 && valueWithoutPrefix !== variables) {
+          return String(valueWithoutPrefix);
+        }
+      }
+      
+      // Original path resolution logic (fallback)
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        
+        if (value && typeof value === 'object') {
+          // Handle array access with [index] notation
+          if (key.includes('[') && key.includes(']')) {
+            const arrayMatch = key.match(/^([^[]+)\[(\d+)\]$/);
+            if (arrayMatch) {
+              const [, arrayKey, indexStr] = arrayMatch;
+              const index = parseInt(indexStr, 10);
+              if (arrayKey in value && Array.isArray(value[arrayKey]) && index < value[arrayKey].length) {
+                value = value[arrayKey][index];
+                continue;
+              } else {
+                return match; // Array access failed
+              }
+            }
+          }
+          
+          // Handle special keys with bracket notation like ["special-key"]
+          if (key.startsWith('"') && key.endsWith('"')) {
+            const specialKey = key.slice(1, -1); // Remove quotes
+            if (specialKey in value) {
+              value = value[specialKey];
+              continue;
+            } else {
+              return match; // Special key not found
+            }
+          }
+          
+          // Regular object property access
+          if (key in value) {
+            value = value[key];
+          } else {
+            return match; // Key not found, keep original
+          }
         } else {
-          return match; // Keep original if path not found
+          return match; // Not an object, can't traverse further
         }
       }
       

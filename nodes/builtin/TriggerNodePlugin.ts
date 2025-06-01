@@ -2,6 +2,7 @@ import React from 'react';
 import { NodePlugin, NodePluginMetadata } from '../base/NodePlugin';
 import { ExecutionContext } from '../../core/execution/ExecutionContext';
 import { TriggerNodeData } from '../../types';
+import { VariableDefinition } from '../../core/variables/VariableRegistry';
 
 export class TriggerNodePlugin extends NodePlugin<TriggerNodeData> {
   readonly metadata: NodePluginMetadata = {
@@ -21,6 +22,29 @@ export class TriggerNodePlugin extends NodePlugin<TriggerNodeData> {
       label: 'Trigger',
       triggerType: 'manual',
     };
+  }
+
+  getOutputSchema(): VariableDefinition[] {
+    return [
+      {
+        name: 'triggerInfo',
+        type: 'string',
+        description: 'Information about how the workflow was triggered',
+        example: 'Triggered by manual'
+      },
+      {
+        name: 'triggerTimestamp',
+        type: 'string',
+        description: 'ISO timestamp of when the workflow was triggered',
+        example: '2024-01-01T12:00:00.000Z'
+      },
+      {
+        name: 'triggerType',
+        type: 'string',
+        description: 'Type of trigger that started the workflow',
+        example: 'manual'
+      }
+    ];
   }
 
   async execute(input: any, data: TriggerNodeData, context: ExecutionContext): Promise<any> {
@@ -51,7 +75,7 @@ export class TriggerNodePlugin extends NodePlugin<TriggerNodeData> {
     return output;
   }
 
-  renderEditor(data: TriggerNodeData, onChange: (data: TriggerNodeData) => void): React.ReactNode {
+  renderEditor(data: TriggerNodeData, onChange: (data: TriggerNodeData) => void, context?: { nodeId: string; availableVariables: any[] }): React.ReactNode {
     return React.createElement('div', { className: 'space-y-4' }, [
       React.createElement('div', { key: 'triggerType' }, [
         React.createElement('label', {

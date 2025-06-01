@@ -33,6 +33,8 @@ export interface LLMAgentNodeData extends BaseNodeData {
   type: CustomNodeType.LLM_AGENT;
   prompt: string;
   model: string; // e.g., 'gemini-2.5-flash-preview-04-17'
+  temperature?: number; // AI creativity/randomness (0-1)
+  maxTokens?: number; // Maximum response length
 }
 
 export interface ToolActionNodeData extends BaseNodeData {

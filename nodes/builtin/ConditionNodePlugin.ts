@@ -2,16 +2,17 @@ import React from 'react';
 import { NodePlugin, NodePluginMetadata } from '../base/NodePlugin';
 import { ExecutionContext } from '../../core/execution/ExecutionContext';
 import { ConditionNodeData } from '../../types';
+import { VariableDefinition } from '../../core/variables/VariableRegistry';
 
 export class ConditionNodePlugin extends NodePlugin<ConditionNodeData> {
   readonly metadata: NodePluginMetadata = {
     type: 'conditionNode',
     name: 'Condition',
-    description: 'Evaluate conditions and branch workflow execution',
+    description: 'Conditional branching based on data evaluation',
     version: '1.0.0',
     category: 'condition',
     icon: 'ConditionIcon',
-    color: 'bg-teal-500',
+    color: 'bg-yellow-500',
   };
 
   createDefaultData(): ConditionNodeData {
@@ -19,8 +20,31 @@ export class ConditionNodePlugin extends NodePlugin<ConditionNodeData> {
       id: '',
       type: 'conditionNode' as any,
       label: 'Condition',
-      conditionLogic: 'input.status === "approved"',
+      conditionLogic: 'input.value > 10',
     };
+  }
+
+  getOutputSchema(): VariableDefinition[] {
+    return [
+      {
+        name: 'conditionResult',
+        type: 'boolean',
+        description: 'Result of the condition evaluation (true/false)',
+        example: true
+      },
+      {
+        name: 'conditionExpression',
+        type: 'string',
+        description: 'The original condition expression that was evaluated',
+        example: 'input.value > 10'
+      },
+      {
+        name: 'evaluatedAt',
+        type: 'string',
+        description: 'Timestamp when the condition was evaluated',
+        example: '2024-01-01T12:00:00.000Z'
+      }
+    ];
   }
 
   async execute(input: any, data: ConditionNodeData, context: ExecutionContext): Promise<any> {
@@ -74,7 +98,7 @@ export class ConditionNodePlugin extends NodePlugin<ConditionNodeData> {
     }
   }
 
-  renderEditor(data: ConditionNodeData, onChange: (data: ConditionNodeData) => void): React.ReactNode {
+  renderEditor(data: ConditionNodeData, onChange: (data: ConditionNodeData) => void, context?: { nodeId: string; availableVariables: any[] }): React.ReactNode {
     return React.createElement('div', { className: 'space-y-4' }, [
       React.createElement('div', { key: 'conditionLogic' }, [
         React.createElement('label', {
