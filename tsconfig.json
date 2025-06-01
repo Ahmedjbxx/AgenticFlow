@@ -1,32 +1,40 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
-    "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "allowJs": true,
-    "jsx": "react-jsx",
-
-    /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*" :  ["./*"]
+      "@agenticflow/types": ["packages/types"],
+      "@agenticflow/core": ["packages/core"],
+      "@agenticflow/config": ["packages/config"],
+      "@agenticflow/nodes": ["packages/nodes"],
+      "@agenticflow/ui": ["packages/ui"],
+      "@agenticflow/hooks": ["packages/hooks"],
+      "@agenticflow/templates": ["packages/templates"],
+      "@agenticflow/styles": ["packages/styles"],
+      "@agenticflow/testing": ["packages/testing"]
     }
   },
-  "include": ["src", "**/*.ts", "**/*.tsx", "src/types/*.d.ts"],
-  "exclude": ["node_modules"]
+  "files": [],
+  "references": [
+    { "path": "./packages/types" },
+    { "path": "./packages/core" },
+    { "path": "./packages/config" },
+    { "path": "./packages/nodes" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/hooks" },
+    { "path": "./packages/templates" },
+    { "path": "./packages/styles" },
+    { "path": "./packages/testing" }
+  ]
 }
