@@ -1,5 +1,5 @@
 // Core ApplicationCore
-export { ApplicationCore } from './ApplicationCore';
+export { ApplicationCore, applicationCore } from './ApplicationCore';
 
 // Event system
 export { EventBus, type IEventBus } from './events/EventBus';

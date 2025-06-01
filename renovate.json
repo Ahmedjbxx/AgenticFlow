@@ -1,0 +1,240 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "AgenticFlow Monorepo - Automated Dependency Management",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separatePatchReleases",
+    "group:monorepos",
+    "group:recommended",
+    "workarounds:all"
+  ],
+  "timezone": "America/New_York",
+  "schedule": [
+    "before 6am on Monday"
+  ],
+  "prHourlyLimit": 3,
+  "prConcurrentLimit": 5,
+  "branchConcurrentLimit": 10,
+  "semanticCommits": "enabled",
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "🔄 Dependency Dashboard - AgenticFlow",
+  "dependencyDashboardHeader": "Welcome to the AgenticFlow dependency dashboard! Here you can see all pending dependency updates.",
+  "assignees": ["@team-leads"],
+  "reviewers": ["@team-reviewers"],
+  "labels": ["dependencies", "automated"],
+  "rangeStrategy": "bump",
+  "bumpVersion": "patch",
+  "commitMessagePrefix": "⬆️",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"],
+    "commitMessageAction": "maintain",
+    "commitMessageTopic": "lock files",
+    "automerge": true
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "labels": ["security", "vulnerability", "urgent"],
+    "assignees": ["@security-team"],
+    "prPriority": 10,
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "description": "Group all pnpm catalog dependencies together",
+      "matchFiles": ["pnpm-workspace.yaml"],
+      "matchDepTypes": ["catalog"],
+      "groupName": "catalog dependencies",
+      "schedule": ["before 6am on monday"],
+      "automerge": true,
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Group TypeScript and related packages",
+      "matchPackageNames": [
+        "typescript",
+        "@types/node",
+        "@types/react",
+        "@types/react-dom",
+        "ts-jest",
+        "ts-node",
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/parser"
+      ],
+      "groupName": "TypeScript packages",
+      "schedule": ["before 6am on monday"],
+      "automerge": true,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Group React packages",
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "groupName": "React packages",
+      "schedule": ["before 6am on monday"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Group build tools",
+      "matchPackageNames": [
+        "vite",
+        "turbo",
+        "tsup",
+        "@vitejs/plugin-react",
+        "rollup",
+        "esbuild"
+      ],
+      "groupName": "build tools",
+      "schedule": ["before 6am on monday"],
+      "automerge": true,
+      "minimumReleaseAge": "5 days"
+    },
+    {
+      "description": "Group testing frameworks",
+      "matchPackageNames": [
+        "jest",
+        "vitest",
+        "@testing-library/react",
+        "@testing-library/jest-dom",
+        "@testing-library/user-event",
+        "playwright",
+        "@playwright/test"
+      ],
+      "groupName": "testing frameworks",
+      "schedule": ["before 6am on monday"],
+      "automerge": true,
+      "minimumReleaseAge": "5 days"
+    },
+    {
+      "description": "Group code quality tools",
+      "matchPackageNames": [
+        "@biomejs/biome",
+        "prettier",
+        "lefthook",
+        "lint-staged",
+        "husky"
+      ],
+      "groupName": "code quality tools",
+      "schedule": ["before 6am on monday"],
+      "automerge": true,
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Group UI libraries",
+      "matchPackageNames": [
+        "reactflow",
+        "zustand",
+        "react-mentions",
+        "@headlessui/react",
+        "@heroicons/react"
+      ],
+      "groupName": "UI libraries",
+      "schedule": ["before 6am on monday"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Group CSS/styling packages",
+      "matchPackageNames": [
+        "tailwindcss",
+        "@tailwindcss/forms",
+        "@tailwindcss/typography",
+        "postcss",
+        "autoprefixer"
+      ],
+      "groupName": "CSS/styling packages",
+      "schedule": ["before 6am on monday"],
+      "automerge": true,
+      "minimumReleaseAge": "5 days"
+    },
+    {
+      "description": "Handle major updates with extra care",
+      "matchUpdateTypes": ["major"],
+      "schedule": ["before 6am on monday"],
+      "automerge": false,
+      "minimumReleaseAge": "14 days",
+      "labels": ["major-update", "breaking-change"],
+      "assignees": ["@architecture-team"],
+      "reviewers": ["@senior-developers"]
+    },
+    {
+      "description": "Auto-merge patch updates for stable packages",
+      "matchUpdateTypes": ["patch"],
+      "excludePackageNames": [
+        "react",
+        "react-dom",
+        "@google/genai",
+        "reactflow"
+      ],
+      "automerge": true,
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Security updates - immediate processing",
+      "matchDepTypes": ["vulnerabilities"],
+      "schedule": ["at any time"],
+      "automerge": false,
+      "labels": ["security", "urgent"],
+      "prPriority": 10,
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Development dependencies - more lenient",
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "minimumReleaseAge": "3 days",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Production dependencies - more careful",
+      "matchDepTypes": ["dependencies"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Workspace protocol packages - auto-merge",
+      "matchCurrentVersion": "workspace:*",
+      "automerge": true,
+      "schedule": ["at any time"]
+    }
+  ],
+  "ignoreDeps": [
+    "node"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.turbo/**"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update versions in catalog section of pnpm-workspace.yaml",
+      "fileMatch": ["^pnpm-workspace\\.yaml$"],
+      "matchStrings": [
+        "(?<depName>[a-z0-9@/_-]+):\\s*\\^?(?<currentValue>[0-9.]+)"
+      ],
+      "datasourceTemplate": "npm"
+    }
+  ],
+  "postUpdateOptions": [
+    "pnpmDedupe"
+  ],
+  "platformAutomerge": true,
+  "rebaseWhen": "conflicted",
+  "includeForks": false,
+  "forkProcessing": "disabled"
+} 

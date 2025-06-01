@@ -1,0 +1,323 @@
+name: 🚀 Release
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - snapshot
+          - prerelease
+          - graduate
+      dry_run:
+        description: 'Dry run (no actual publishing)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '20.15.0'
+  PNPM_VERSION: '10.2.1'
+
+jobs:
+  # Job 1: Check if release is needed
+  check-release:
+    name: 🔍 Check Release Status
+    runs-on: ubuntu-latest
+    
+    outputs:
+      has-changesets: ${{ steps.changeset-check.outputs.has-changesets }}
+      should-release: ${{ steps.should-release.outputs.result }}
+      
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔍 Check for changesets
+        id: changeset-check
+        run: |
+          if [ -n "$(ls .changeset/*.md 2>/dev/null | grep -v README)" ]; then
+            echo "has-changesets=true" >> $GITHUB_OUTPUT
+            echo "📦 Changesets found"
+          else
+            echo "has-changesets=false" >> $GITHUB_OUTPUT
+            echo "📦 No changesets found"
+          fi
+
+      - name: 🤔 Should release?
+        id: should-release
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "snapshot" ] || [ "${{ github.event.inputs.release_type }}" = "prerelease" ] || [ "${{ github.event.inputs.release_type }}" = "graduate" ]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+            echo "🚀 Manual release requested"
+          elif [ "${{ steps.changeset-check.outputs.has-changesets }}" = "true" ]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+            echo "🚀 Changesets found, release needed"
+          else
+            echo "result=false" >> $GITHUB_OUTPUT
+            echo "⏭️ No release needed"
+          fi
+
+  # Job 2: Release pipeline
+  release:
+    name: 📦 Release Packages
+    runs-on: ubuntu-latest
+    needs: check-release
+    if: needs.check-release.outputs.should-release == 'true'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
+      id-token: write
+      
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Build packages
+        run: pnpm build
+
+      - name: 🧪 Run tests
+        run: pnpm test
+        env:
+          COVERAGE_ENABLED: false
+
+      - name: 🔍 Validate packages
+        run: |
+          echo "🔍 Validating packages before release..."
+          # Ensure all packages have build outputs
+          for package in packages/*/package.json; do
+            package_dir=$(dirname "$package")
+            package_name=$(jq -r '.name' "$package")
+            
+            if [ "$package_name" != "null" ] && [ "$package_name" != "@agenticflow/eslint-config" ] && [ "$package_name" != "@agenticflow/prettier-config" ]; then
+              if [ ! -d "$package_dir/dist" ]; then
+                echo "❌ Missing dist directory for $package_name"
+                exit 1
+              fi
+              echo "✅ $package_name validated"
+            fi
+          done
+
+      # Handle different release types
+      - name: 📸 Snapshot Release
+        if: steps.changeset-check.outputs.has-changesets == 'true' && github.event.inputs.release_type == 'snapshot' && github.event.inputs.dry_run != 'true'
+        run: |
+          echo "📸 Creating snapshot release..."
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pnpm publish:snapshot
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🧪 Prerelease
+        if: steps.changeset-check.outputs.has-changesets == 'true' && github.event.inputs.release_type == 'prerelease' && github.event.inputs.dry_run != 'true'
+        run: |
+          echo "🧪 Creating prerelease..."
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pnpm publish:prerelease
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🚀 Production Release
+        if: steps.changeset-check.outputs.has-changesets == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event.inputs.release_type == 'auto') && github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pnpm publish:release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🚀 Graduate Release
+        if: steps.changeset-check.outputs.has-changesets == 'true' && github.event.inputs.release_type == 'graduate' && github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          pnpm publish:graduate
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 3: Post-release notifications
+  notify:
+    name: 📢 Post-Release
+    runs-on: ubuntu-latest
+    needs: [check-release, release]
+    if: always() && needs.release.result == 'success'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 📊 Generate release summary
+        run: |
+          echo "🎉 Release completed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Released Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get the latest versions of packages
+          for package in packages/*/package.json; do
+            package_name=$(jq -r '.name' "$package")
+            package_version=$(jq -r '.version' "$package")
+            
+            if [ "$package_name" != "null" ] && [ "$package_name" != "@agenticflow/eslint-config" ] && [ "$package_name" != "@agenticflow/prettier-config" ]; then
+              echo "- **$package_name**: v$package_version" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [npm packages](https://www.npmjs.com/search?q=%40agenticflow)" >> $GITHUB_STEP_SUMMARY
+          echo "- [GitHub releases](https://github.com/${{ github.repository }}/releases)" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📢 Success notification
+        run: |
+          echo "🎉 Release pipeline completed successfully!"
+          echo "🔗 Check the releases at: https://github.com/${{ github.repository }}/releases"
+          echo "📦 Packages available at: https://www.npmjs.com/search?q=%40agenticflow"
+
+  # Job 4: Release failure handling
+  failure-handler:
+    name: ❌ Handle Release Failure
+    runs-on: ubuntu-latest
+    needs: [check-release, release]
+    if: always() && needs.release.result == 'failure'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ❌ Failure notification
+        run: |
+          echo "❌ Release failed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔍 Troubleshooting Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the build logs above for errors" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify all tests are passing" >> $GITHUB_STEP_SUMMARY
+          echo "3. Ensure npm authentication is working" >> $GITHUB_STEP_SUMMARY
+          echo "4. Check if package versions are already published" >> $GITHUB_STEP_SUMMARY
+          echo "5. Verify changesets are properly formatted" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 Manual Release" >> $GITHUB_STEP_SUMMARY
+          echo "If needed, you can trigger a manual release:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "pnpm install" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm build" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm test" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm changeset:status" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm version" >> $GITHUB_STEP_SUMMARY
+          echo "pnpm release" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: 🚨 Create issue for failed release
+        uses: actions/github-script@v7
+        if: github.event_name == 'push'
+        with:
+          script: |
+            const title = `🚨 Release Failed - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            ## ❌ Release Failure Report
+            
+            **Workflow**: ${context.workflow}
+            **Run ID**: ${context.runId}
+            **Commit**: ${context.sha}
+            **Branch**: ${context.ref}
+            
+            ### 🔍 Details
+            The automated release process failed. Please check the workflow logs for details.
+            
+            ### 🔗 Links
+            - [Failed workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            - [Troubleshooting guide](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/master/VERSIONING_STRATEGY.md#troubleshooting)
+            
+            ### 📋 Action Items
+            - [ ] Review workflow logs
+            - [ ] Fix any issues found
+            - [ ] Manually trigger release if needed
+            - [ ] Update release process if necessary
+            `;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'release', 'ci/cd']
+            }); 

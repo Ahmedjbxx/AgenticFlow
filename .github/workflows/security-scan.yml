@@ -1,0 +1,312 @@
+name: 🔒 Security Scan
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    # Run security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.15.0'
+  PNPM_VERSION: '10.2.1'
+
+jobs:
+  # Job 1: Dependency vulnerabilities
+  dependency-audit:
+    name: 🔍 Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔍 pnpm audit
+        run: |
+          echo "🔍 Running pnpm audit..."
+          pnpm audit --audit-level moderate --json > audit-results.json || true
+          
+          # Check if there are any vulnerabilities
+          if [ -s audit-results.json ]; then
+            echo "⚠️ Vulnerabilities found:"
+            cat audit-results.json | jq '.'
+            
+            # Count critical and high vulnerabilities
+            critical=$(cat audit-results.json | jq '.advisories | map(select(.severity == "critical")) | length' 2>/dev/null || echo "0")
+            high=$(cat audit-results.json | jq '.advisories | map(select(.severity == "high")) | length' 2>/dev/null || echo "0")
+            
+            echo "🚨 Critical vulnerabilities: $critical"
+            echo "⚠️ High vulnerabilities: $high"
+            
+            if [ "$critical" -gt 0 ] || [ "$high" -gt 0 ]; then
+              echo "❌ Critical or high severity vulnerabilities found!"
+              exit 1
+            fi
+          else
+            echo "✅ No vulnerabilities found"
+          fi
+
+      - name: 📊 Upload audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit-results
+          path: audit-results.json
+
+  # Job 2: Secret scanning
+  secret-scan:
+    name: 🔐 Secret Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔐 TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # Job 3: Code security analysis
+  codeql-analysis:
+    name: 🔬 CodeQL Analysis
+    runs-on: ubuntu-latest
+    
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript']
+        
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔬 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Build packages
+        run: pnpm build
+
+      - name: 🔬 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # Job 4: Container security (if using Docker)
+  container-scan:
+    name: 🐳 Container Security
+    runs-on: ubuntu-latest
+    if: false # Enable when we have Dockerfiles
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐳 Build Docker image
+        run: docker build -t agenticflow:latest .
+
+      - name: 🔍 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'agenticflow:latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📊 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 5: License compliance
+  license-check:
+    name: 📄 License Compliance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 📄 Check licenses
+        run: |
+          echo "📄 Checking license compliance..."
+          npx license-checker --onlyAllow 'MIT;Apache-2.0;ISC;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense' --summary > license-summary.txt || true
+          
+          if [ -f license-summary.txt ]; then
+            echo "📊 License summary:"
+            cat license-summary.txt
+          fi
+          
+          # Check for prohibited licenses
+          prohibited_licenses=$(npx license-checker --excludePackages 'test' --json | jq -r 'to_entries[] | select(.value.licenses | test("GPL|AGPL|LGPL|CPAL|OSL|EPL|MPL|EUPL"; "i")) | .key + ": " + (.value.licenses | tostring)' 2>/dev/null || echo "")
+          
+          if [ -n "$prohibited_licenses" ]; then
+            echo "❌ Found prohibited licenses:"
+            echo "$prohibited_licenses"
+            exit 1
+          else
+            echo "✅ All licenses are compliant"
+          fi
+
+      - name: 📊 Upload license report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: license-compliance-report
+          path: license-summary.txt
+
+  # Job 6: Security policy compliance
+  security-policy:
+    name: 🛡️ Security Policy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🛡️ Check security policy
+        run: |
+          echo "🛡️ Checking security policy compliance..."
+          
+          # Check for SECURITY.md
+          if [ ! -f SECURITY.md ]; then
+            echo "⚠️ SECURITY.md not found"
+            echo "Creating basic security policy..."
+            cat > SECURITY.md << 'EOF'
+          # Security Policy
+          
+          ## Supported Versions
+          
+          | Version | Supported          |
+          | ------- | ------------------ |
+          | 0.x.x   | :white_check_mark: |
+          
+          ## Reporting a Vulnerability
+          
+          Please report security vulnerabilities by emailing security@agenticflow.com
+          or by creating a private security advisory on GitHub.
+          
+          Do not report security vulnerabilities through public GitHub issues.
+          EOF
+            echo "📝 Created basic SECURITY.md"
+          else
+            echo "✅ SECURITY.md found"
+          fi
+          
+          # Check for .env.example
+          if [ ! -f .env.example ]; then
+            echo "⚠️ .env.example not found"
+          else
+            echo "✅ .env.example found"
+          fi
+          
+          # Check that .env files are in .gitignore
+          if ! grep -q "\.env" .gitignore 2>/dev/null; then
+            echo "⚠️ .env not found in .gitignore"
+          else
+            echo "✅ .env files are gitignored"
+          fi
+
+  # Job 7: Security summary
+  security-summary:
+    name: 📋 Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, secret-scan, codeql-analysis, license-check, security-policy]
+    if: always()
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📋 Generate security summary
+        run: |
+          echo "# 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Audit | ${{ needs.dependency-audit.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Check | ${{ needs.license-check.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Policy | ${{ needs.security-policy.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status
+          if [ "${{ needs.dependency-audit.result }}" = "success" ] && 
+             [ "${{ needs.secret-scan.result }}" = "success" ] && 
+             [ "${{ needs.codeql-analysis.result }}" = "success" ] && 
+             [ "${{ needs.license-check.result }}" = "success" ] && 
+             [ "${{ needs.security-policy.result }}" = "success" ]; then
+            echo "## ✅ Overall Status: SECURE" >> $GITHUB_STEP_SUMMARY
+            echo "All security checks passed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Overall Status: ISSUES FOUND" >> $GITHUB_STEP_SUMMARY
+            echo "Some security checks failed. Please review the logs above." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔗 Security Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- [Security Policy](https://github.com/${{ github.repository }}/blob/master/SECURITY.md)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Dependency Vulnerabilities](https://github.com/${{ github.repository }}/security/advisories)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Code Scanning Alerts](https://github.com/${{ github.repository }}/security/code-scanning)" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🚨 Fail on critical issues
+        if: needs.dependency-audit.result == 'failure' || needs.secret-scan.result == 'failure'
+        run: |
+          echo "❌ Critical security issues found!"
+          echo "Please fix the issues before merging."
+          exit 1 

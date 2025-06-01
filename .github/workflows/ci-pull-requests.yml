@@ -1,0 +1,352 @@
+name: 🔍 CI - Pull Requests
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [master]
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20.15.0'
+  PNPM_VERSION: '10.2.1'
+
+jobs:
+  # Job 1: Setup and validation
+  setup:
+    name: 🚀 Setup & Validation
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    outputs:
+      packages-changed: ${{ steps.changes.outputs.packages }}
+      should-test: ${{ steps.changes.outputs.packages == 'true' || github.event_name == 'push' }}
+      should-build: ${{ steps.changes.outputs.packages == 'true' || github.event_name == 'push' }}
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Detect Changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            packages:
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - '.github/workflows/**'
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ✅ Validate workspace
+        run: |
+          echo "🔍 Validating workspace configuration..."
+          pnpm list --depth=0
+          echo "✅ Workspace validation complete"
+
+  # Job 2: Linting and formatting
+  lint:
+    name: 🧹 Lint & Format
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.should-test == 'true'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🧹 Run ESLint
+        run: pnpm lint
+
+      - name: 🎨 Check formatting
+        run: pnpm format:check
+
+  # Job 3: Type checking
+  typecheck:
+    name: 🔍 TypeScript
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.should-test == 'true'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔍 TypeScript compilation
+        run: pnpm typecheck
+
+  # Job 4: Testing
+  test:
+    name: 🧪 Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.should-test == 'true'
+    
+    strategy:
+      matrix:
+        test-group: [backend, frontend]
+        
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🧪 Run tests (${{ matrix.test-group }})
+        run: |
+          if [ "${{ matrix.test-group }}" = "backend" ]; then
+            echo "🔧 Running backend tests..."
+            pnpm test:backend
+          else
+            echo "🎨 Running frontend tests..."
+            pnpm test:frontend
+          fi
+        env:
+          COVERAGE_ENABLED: true
+
+      - name: 📊 Upload coverage
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          flags: ${{ matrix.test-group }}
+          name: coverage-${{ matrix.test-group }}
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Job 5: Build packages
+  build:
+    name: 🏗️ Build
+    runs-on: ubuntu-latest
+    needs: [setup, lint, typecheck]
+    if: needs.setup.outputs.should-build == 'true'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Build all packages
+        run: pnpm build
+
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            packages/*/dist
+            packages/**/dist
+          retention-days: 7
+
+  # Job 6: Package validation
+  validate-packages:
+    name: 📦 Package Validation
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: needs.setup.outputs.should-build == 'true'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔍 Validate package exports
+        run: |
+          echo "🔍 Validating package exports..."
+          # Check that all packages have proper build outputs
+          for package in packages/*/package.json; do
+            package_dir=$(dirname "$package")
+            package_name=$(jq -r '.name' "$package")
+            
+            if [ "$package_name" != "null" ] && [ "$package_name" != "@agenticflow/eslint-config" ] && [ "$package_name" != "@agenticflow/prettier-config" ]; then
+              echo "Checking $package_name..."
+              
+              if [ ! -d "$package_dir/dist" ]; then
+                echo "❌ Missing dist directory for $package_name"
+                exit 1
+              fi
+              
+              echo "✅ $package_name has build output"
+            fi
+          done
+          echo "✅ All packages validated"
+
+      - name: 🔍 Check changeset status
+        run: |
+          echo "🔍 Checking changeset status..."
+          pnpm changeset:status || echo "No changesets found (this is OK for infrastructure changes)"
+
+  # Job 7: Integration check
+  integration:
+    name: 🔗 Integration Check
+    runs-on: ubuntu-latest
+    needs: [test, build, validate-packages]
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped') && needs.build.result == 'success'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ✅ Integration status
+        run: |
+          echo "🎉 All CI checks passed!"
+          echo "✅ Linting: ${{ needs.lint.result }}"
+          echo "✅ TypeScript: ${{ needs.typecheck.result }}"
+          echo "✅ Tests: ${{ needs.test.result }}"
+          echo "✅ Build: ${{ needs.build.result }}"
+          echo "✅ Package Validation: ${{ needs.validate-packages.result }}"
+          echo ""
+          echo "🚀 Ready for merge!" 

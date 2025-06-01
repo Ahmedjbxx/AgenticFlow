@@ -7,30 +7,179 @@
     "NODE_ENV",
     "VITE_*"
   ],
+  "globalPassThroughEnv": [
+    "npm_config_user_config",
+    "npm_config_cache"
+  ],
+  "remoteCache": {
+    "enabled": false
+  },
   "tasks": {
     "clean": {
-      "cache": false
+      "cache": false,
+      "dependsOn": []
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**",
+        "build/**",
+        "lib/**"
+      ],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "src/**/*.jsx",
+        "src/**/*.json",
+        "package.json",
+        "tsconfig*.json",
+        "vite.config.*",
+        "rollup.config.*"
+      ],
+      "outputLogs": "new-only",
+      "persistent": false
+    },
+    "build:types": {
+      "dependsOn": [],
+      "outputs": ["dist/**"],
+      "inputs": ["src/**/*.ts", "package.json", "tsconfig*.json"],
+      "outputLogs": "hash-only"
+    },
+    "build:config": {
+      "dependsOn": ["@agenticflow/types#build"],
+      "outputs": ["dist/**"],
+      "inputs": ["src/**/*.ts", "package.json", "tsconfig*.json"],
+      "outputLogs": "hash-only"
+    },
+    "build:core": {
+      "dependsOn": ["@agenticflow/types#build", "@agenticflow/config#build"],
+      "outputs": ["dist/**"],
+      "inputs": ["src/**/*.ts", "package.json", "tsconfig*.json"],
+      "outputLogs": "hash-only"
+    },
+    "build:nodes": {
+      "dependsOn": ["@agenticflow/types#build", "@agenticflow/core#build"],
+      "outputs": ["dist/**"],
+      "inputs": ["src/**/*.ts", "package.json", "tsconfig*.json"],
+      "outputLogs": "hash-only"
+    },
+    "build:frontend": {
+      "dependsOn": ["@agenticflow/types#build", "@agenticflow/core#build", "@agenticflow/store#build"],
+      "outputs": ["dist/**", "build/**"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.css",
+        "package.json",
+        "tsconfig*.json",
+        "vite.config.*",
+        "index.html"
+      ],
+      "outputLogs": "new-only"
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tsconfig*.json",
+        "package.json"
+      ],
+      "outputLogs": "errors-only"
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"]
     },
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**/*.ts", "src/**/*.tsx", "**/*.test.ts", "**/*.spec.ts"]
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "jest.config.*",
+        "vitest.config.*",
+        "package.json"
+      ],
+      "outputLogs": "new-only",
+      "env": ["COVERAGE_ENABLED"]
+    },
+    "test:unit": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "jest.config.*",
+        "vitest.config.*"
+      ],
+      "outputLogs": "errors-only"
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
     },
     "lint": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^typecheck"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "src/**/*.jsx",
+        ".eslintrc*",
+        "eslint.config.*",
+        "package.json"
+      ],
+      "outputLogs": "errors-only"
     },
-    "format": {},
-    "format:check": {}
+    "lint:fix": {
+      "cache": false,
+      "dependsOn": ["^typecheck"],
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "src/**/*.jsx",
+        ".eslintrc*",
+        "eslint.config.*"
+      ]
+    },
+    "format": {
+      "cache": false,
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "src/**/*.jsx",
+        "src/**/*.json",
+        "src/**/*.css",
+        ".prettierrc*",
+        "prettier.config.*"
+      ]
+    },
+    "format:check": {
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "src/**/*.jsx",
+        "src/**/*.json",
+        "src/**/*.css",
+        ".prettierrc*",
+        "prettier.config.*"
+      ],
+      "outputLogs": "errors-only"
+    }
   }
 } 

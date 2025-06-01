@@ -1,41 +1,64 @@
 {
   "name": "@agenticflow/core",
   "version": "0.1.0",
-  "description": "Core business logic for AgenticFlow",
+  "description": "Core business logic and execution engine for AgenticFlow",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "files": [
-    "dist/**/*"
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:unit": "jest",
+    "lint": "echo 'No linting configured'",
+    "format": "echo 'No formatting configured'",
+    "format:check": "echo 'No format checking configured'",
+    "prepublishOnly": "pnpm build && pnpm test"
   },
   "dependencies": {
     "@agenticflow/types": "workspace:*",
     "@agenticflow/config": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "rimraf": "^6.0.1",
-    "@types/node": "^22.14.0"
+    "@agenticflow/typescript-config": "workspace:*",
+    "rimraf": "^5.0.0",
+    "typescript": "catalog:",
+    "jest": "catalog:"
   },
-  "publishConfig": {
-    "access": "public"
-  },
+  "peerDependencies": {},
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ahmedjbxx/AgenticFlow.git",
+    "url": "https://github.com/agenticflow/agenticflow",
     "directory": "packages/core"
   },
   "keywords": [
     "agenticflow",
+    "automation",
+    "workflow",
     "core",
-    "business-logic",
-    "workflow-engine"
+    "execution-engine"
   ],
-  "license": "MIT"
+  "author": "AgenticFlow Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

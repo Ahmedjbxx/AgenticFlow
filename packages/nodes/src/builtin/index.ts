@@ -8,9 +8,11 @@ export { DataTransformNodePlugin } from './DataTransformNodePlugin.js';
 export { DelayNodePlugin } from './DelayNodePlugin.js';
 export { SwitchNodePlugin } from './SwitchNodePlugin.js';
 export { LoopNodePlugin } from './LoopNodePlugin.js';
+export { RealNumbersNodePlugin } from './RealNumbersNodePlugin.js';
 
 // All 9 core built-in nodes have been successfully migrated! 🎉
+// Plus our new testing node: RealNumbersNodePlugin
 
-// More nodes will be exported here as they are migrated
+// More nodes will be exported here as they are added
 // export { SwitchNodePlugin } from './SwitchNodePlugin.js';
 // export { LoopNodePlugin } from './LoopNodePlugin.js'; 

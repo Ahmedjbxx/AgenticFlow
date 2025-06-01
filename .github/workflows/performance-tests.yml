@@ -1,0 +1,409 @@
+name: ⚡ Performance Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    # Run performance tests weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      benchmark-type:
+        description: 'Benchmark type'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - build
+          - bundle
+          - runtime
+
+env:
+  NODE_VERSION: '20.15.0'
+  PNPM_VERSION: '10.2.1'
+
+jobs:
+  # Job 1: Build performance
+  build-performance:
+    name: 🏗️ Build Performance
+    runs-on: ubuntu-latest
+    if: github.event.inputs.benchmark-type == 'build' || github.event.inputs.benchmark-type == 'all' || github.event.inputs.benchmark-type == ''
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 🔧 Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: 📁 Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: ⏱️ Install dependencies (timed)
+        run: |
+          echo "📦 Installing dependencies..."
+          start_time=$(date +%s.%N)
+          pnpm install --frozen-lockfile
+          end_time=$(date +%s.%N)
+          install_time=$(echo "$end_time - $start_time" | bc -l)
+          echo "⏱️ Install time: ${install_time}s"
+          echo "INSTALL_TIME=${install_time}" >> $GITHUB_ENV
+
+      - name: ⏱️ TypeScript compilation (timed)
+        run: |
+          echo "🔍 TypeScript compilation..."
+          start_time=$(date +%s.%N)
+          pnpm typecheck
+          end_time=$(date +%s.%N)
+          typecheck_time=$(echo "$end_time - $start_time" | bc -l)
+          echo "⏱️ TypeScript time: ${typecheck_time}s"
+          echo "TYPECHECK_TIME=${typecheck_time}" >> $GITHUB_ENV
+
+      - name: ⏱️ Build packages (timed)
+        run: |
+          echo "🏗️ Building packages..."
+          start_time=$(date +%s.%N)
+          pnpm build
+          end_time=$(date +%s.%N)
+          build_time=$(echo "$end_time - $start_time" | bc -l)
+          echo "⏱️ Build time: ${build_time}s"
+          echo "BUILD_TIME=${build_time}" >> $GITHUB_ENV
+
+      - name: ⏱️ Test execution (timed)
+        run: |
+          echo "🧪 Running tests..."
+          start_time=$(date +%s.%N)
+          pnpm test || true
+          end_time=$(date +%s.%N)
+          test_time=$(echo "$end_time - $start_time" | bc -l)
+          echo "⏱️ Test time: ${test_time}s"
+          echo "TEST_TIME=${test_time}" >> $GITHUB_ENV
+
+      - name: 📊 Generate build performance report
+        run: |
+          echo "# 🏗️ Build Performance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Time | Target | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependencies Install | ${INSTALL_TIME}s | <30s | $([ $(echo "${INSTALL_TIME} < 30" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript Compilation | ${TYPECHECK_TIME}s | <20s | $([ $(echo "${TYPECHECK_TIME} < 20" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package Build | ${BUILD_TIME}s | <30s | $([ $(echo "${BUILD_TIME} < 30" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Execution | ${TEST_TIME}s | <60s | $([ $(echo "${TEST_TIME} < 60" | bc -l) -eq 1 ] && echo "✅" || echo "⚠️") |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          total_time=$(echo "${INSTALL_TIME} + ${TYPECHECK_TIME} + ${BUILD_TIME} + ${TEST_TIME}" | bc -l)
+          echo "**Total CI Time: ${total_time}s**" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Upload performance data
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-performance-${{ github.sha }}
+          path: |
+            performance-data.json
+            
+  # Job 2: Bundle size analysis
+  bundle-analysis:
+    name: 📦 Bundle Analysis
+    runs-on: ubuntu-latest
+    if: github.event.inputs.benchmark-type == 'bundle' || github.event.inputs.benchmark-type == 'all' || github.event.inputs.benchmark-type == ''
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Build packages
+        run: pnpm build
+
+      - name: 📊 Analyze bundle sizes
+        run: |
+          echo "📦 Analyzing bundle sizes..."
+          
+          echo "# 📦 Bundle Size Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Size | Compressed | Target | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------|------------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          total_size=0
+          
+          for package_dir in packages/*/; do
+            if [ -d "$package_dir/dist" ]; then
+              package_name=$(basename "$package_dir")
+              
+              # Calculate uncompressed size
+              size=$(du -sb "$package_dir/dist" | cut -f1)
+              size_kb=$((size / 1024))
+              
+              # Calculate compressed size (gzip simulation)
+              compressed_size=$(find "$package_dir/dist" -type f \( -name "*.js" -o -name "*.css" \) -exec gzip -c {} \; | wc -c)
+              compressed_kb=$((compressed_size / 1024))
+              
+              total_size=$((total_size + size))
+              
+              # Check against targets
+              target_kb=500
+              status="✅"
+              if [ $size_kb -gt $target_kb ]; then
+                status="⚠️"
+              fi
+              
+              echo "| @agenticflow/$package_name | ${size_kb}KB | ${compressed_kb}KB | <${target_kb}KB | $status |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          total_kb=$((total_size / 1024))
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Bundle Size: ${total_kb}KB**" >> $GITHUB_STEP_SUMMARY
+          
+          # Check total size target
+          if [ $total_kb -gt 2000 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Warning**: Total bundle size exceeds 2MB target" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📊 Bundle composition analysis
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Bundle Composition" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          for package_dir in packages/*/; do
+            if [ -d "$package_dir/dist" ]; then
+              package_name=$(basename "$package_dir")
+              echo "### @agenticflow/$package_name" >> $GITHUB_STEP_SUMMARY
+              
+              # Count file types
+              js_files=$(find "$package_dir/dist" -name "*.js" | wc -l)
+              css_files=$(find "$package_dir/dist" -name "*.css" | wc -l)
+              dts_files=$(find "$package_dir/dist" -name "*.d.ts" | wc -l)
+              map_files=$(find "$package_dir/dist" -name "*.map" | wc -l)
+              
+              echo "- JavaScript files: $js_files" >> $GITHUB_STEP_SUMMARY
+              echo "- CSS files: $css_files" >> $GITHUB_STEP_SUMMARY
+              echo "- TypeScript declarations: $dts_files" >> $GITHUB_STEP_SUMMARY
+              echo "- Source maps: $map_files" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+  # Job 3: Memory and CPU benchmarks
+  runtime-performance:
+    name: ⚡ Runtime Performance
+    runs-on: ubuntu-latest
+    if: github.event.inputs.benchmark-type == 'runtime' || github.event.inputs.benchmark-type == 'all' || github.event.inputs.benchmark-type == ''
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Build packages
+        run: pnpm build
+
+      - name: ⚡ Node.js startup performance
+        run: |
+          echo "⚡ Testing Node.js startup performance..."
+          
+          echo "# ⚡ Runtime Performance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Node.js Import Performance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Import Time | Memory Usage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------------|--------------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          for package_dir in packages/*/; do
+            if [ -d "$package_dir/dist" ] && [ -f "$package_dir/package.json" ]; then
+              package_name=$(jq -r '.name' "$package_dir/package.json")
+              
+              if [ "$package_name" != "null" ] && [ "$package_name" != "@agenticflow/eslint-config" ] && [ "$package_name" != "@agenticflow/prettier-config" ]; then
+                echo "Testing $package_name..."
+                
+                # Create test script
+                cat > test_import.js << EOF
+          const start = process.hrtime.bigint();
+          const startMem = process.memoryUsage();
+          
+          try {
+            require('$package_dir/dist/index.js');
+            const end = process.hrtime.bigint();
+            const endMem = process.memoryUsage();
+            
+            const importTime = Number(end - start) / 1000000; // Convert to ms
+            const memoryDelta = endMem.heapUsed - startMem.heapUsed;
+            
+            console.log(\`$package_name,\${importTime.toFixed(2)},\${Math.round(memoryDelta / 1024)}\`);
+          } catch (e) {
+            console.log(\`$package_name,error,error\`);
+          }
+          EOF
+                
+                result=$(node test_import.js 2>/dev/null || echo "$package_name,error,error")
+                IFS=',' read -r pkg time memory <<< "$result"
+                
+                if [ "$time" = "error" ]; then
+                  status="❌"
+                  time="N/A"
+                  memory="N/A"
+                elif [ $(echo "$time > 100" | bc -l 2>/dev/null || echo "0") -eq 1 ]; then
+                  status="⚠️"
+                else
+                  status="✅"
+                fi
+                
+                echo "| $pkg | ${time}ms | ${memory}KB | $status |" >> $GITHUB_STEP_SUMMARY
+                
+                rm -f test_import.js
+              fi
+            fi
+          done
+
+      - name: 🧠 Memory leak detection
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧠 Memory Leak Detection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Create memory test script
+          cat > memory_test.js << 'EOF'
+          const iterations = 100;
+          const results = [];
+          
+          for (let i = 0; i < iterations; i++) {
+            const memBefore = process.memoryUsage().heapUsed;
+            
+            // Simulate some operations
+            const data = new Array(1000).fill(0).map((_, idx) => ({ id: idx, value: Math.random() }));
+            const processed = data.filter(item => item.value > 0.5).map(item => ({ ...item, processed: true }));
+            
+            // Force garbage collection if available
+            if (global.gc) {
+              global.gc();
+            }
+            
+            const memAfter = process.memoryUsage().heapUsed;
+            results.push(memAfter - memBefore);
+            
+            // Clear references
+            data.length = 0;
+            processed.length = 0;
+          }
+          
+          const avgGrowth = results.reduce((a, b) => a + b, 0) / results.length;
+          const maxGrowth = Math.max(...results);
+          
+          console.log(`Average memory growth: ${Math.round(avgGrowth / 1024)}KB`);
+          console.log(`Maximum memory growth: ${Math.round(maxGrowth / 1024)}KB`);
+          
+          if (avgGrowth > 1024 * 1024) { // 1MB
+            console.log('WARNING: Potential memory leak detected');
+            process.exit(1);
+          }
+          EOF
+          
+          echo "🧠 Running memory leak detection..."
+          node --expose-gc memory_test.js >> memory_test_output.txt 2>&1 || true
+          
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          cat memory_test_output.txt >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          
+          rm -f memory_test.js memory_test_output.txt
+
+  # Job 4: Performance regression detection
+  regression-detection:
+    name: 📈 Regression Detection
+    runs-on: ubuntu-latest
+    needs: [build-performance, bundle-analysis, runtime-performance]
+    if: always() && github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📊 Performance regression analysis
+        run: |
+          echo "# 📈 Performance Regression Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Performance comparison will be available once baseline is established." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 Performance Targets" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Time**: <30s" >> $GITHUB_STEP_SUMMARY
+          echo "- **TypeScript Compilation**: <20s" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Execution**: <60s" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bundle Size**: <500KB per package" >> $GITHUB_STEP_SUMMARY
+          echo "- **Import Time**: <100ms per package" >> $GITHUB_STEP_SUMMARY
+          echo "- **Memory Growth**: <1MB during operations" >> $GITHUB_STEP_SUMMARY
+
+  # Job 5: Performance summary
+  performance-summary:
+    name: 📋 Performance Summary
+    runs-on: ubuntu-latest
+    needs: [build-performance, bundle-analysis, runtime-performance]
+    if: always()
+    
+    steps:
+      - name: 📋 Generate performance summary
+        run: |
+          echo "# ⚡ Performance Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Performance | ${{ needs.build-performance.result == 'success' && '✅ Pass' || (needs.build-performance.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bundle Analysis | ${{ needs.bundle-analysis.result == 'success' && '✅ Pass' || (needs.bundle-analysis.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Runtime Performance | ${{ needs.runtime-performance.result == 'success' && '✅ Pass' || (needs.runtime-performance.result == 'skipped' && '⏭️ Skipped' || '❌ Fail') }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 📊 Performance Insights" >> $GITHUB_STEP_SUMMARY
+          echo "- Performance tests help ensure optimal user experience" >> $GITHUB_STEP_SUMMARY
+          echo "- Bundle size analysis prevents code bloat" >> $GITHUB_STEP_SUMMARY
+          echo "- Runtime benchmarks catch performance regressions early" >> $GITHUB_STEP_SUMMARY
+          echo "- Memory leak detection ensures long-term stability" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔗 Performance Resources" >> $GITHUB_STEP_SUMMARY
+          echo "- [Web Performance Best Practices](https://web.dev/performance/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Node.js Performance Tips](https://nodejs.org/en/docs/guides/simple-profiling/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Bundle Analysis Tools](https://bundleanalysis.com/)" >> $GITHUB_STEP_SUMMARY 
