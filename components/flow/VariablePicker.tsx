@@ -71,13 +71,16 @@ export const VariablePicker: React.FC<VariablePickerProps> = ({
   const getNodeTypeColor = (nodeType: string) => {
     const colors: Record<string, string> = {
       'llmAgentNode': 'bg-purple-100 text-purple-800',
-      'httpRequestNode': 'bg-blue-100 text-blue-800',
-      'triggerNode': 'bg-green-100 text-green-800',
-      'conditionNode': 'bg-yellow-100 text-yellow-800',
-      'dataTransformNode': 'bg-orange-100 text-orange-800',
-      'delayNode': 'bg-gray-100 text-gray-800',
+      'toolActionNode': 'bg-amber-100 text-amber-800',
+      'conditionNode': 'bg-orange-100 text-orange-800',
+      'endNode': 'bg-red-100 text-red-800',
       'loopNode': 'bg-indigo-100 text-indigo-800',
-      'switchNode': 'bg-pink-100 text-pink-800',
+      'httpRequestNode': 'bg-teal-100 text-teal-800',
+      'dataTransformNode': 'bg-cyan-100 text-cyan-800',
+      'delayNode': 'bg-rose-100 text-rose-800',
+      'switchNode': 'bg-violet-100 text-violet-800',
+      'realNumbersNode': 'bg-blue-100 text-blue-800',
+      'stringNode': 'bg-green-100 text-green-800',
     };
     return colors[nodeType] || 'bg-gray-100 text-gray-800';
   };

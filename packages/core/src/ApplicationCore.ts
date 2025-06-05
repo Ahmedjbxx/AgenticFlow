@@ -85,6 +85,28 @@ export class ApplicationCore {
   }
 
   /**
+   * Initialize built-in plugins (should be called externally to avoid circular dependencies)
+   */
+  public async initializePlugins(registerBuiltInPlugins: (registry: any) => void): Promise<void> {
+    try {
+      this.logger.info('Registering built-in plugins...');
+      
+      registerBuiltInPlugins(this.nodeRegistry);
+      
+      const stats = this.nodeRegistry.getStats();
+      this.logger.info(`Built-in plugins registered successfully`, stats);
+      
+      this.eventBus.emit('plugins.initialized', {
+        totalPlugins: stats.total,
+        enabledPlugins: stats.enabled,
+        categories: stats.byCategory,
+      });
+    } catch (error) {
+      this.logger.error('Failed to register built-in plugins', error as Error);
+    }
+  }
+
+  /**
    * Create execution context for node execution
    */
   public createExecutionContext(params: {

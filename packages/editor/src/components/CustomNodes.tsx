@@ -65,6 +65,12 @@ const SwitchIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const NumberIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+  </svg>
+);
+
 const CogIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -84,6 +90,7 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   'dataTransformNode': TransformIcon,
   'delayNode': DelayIcon,
   'switchNode': SwitchIcon,
+  'realNumbersNode': NumberIcon,
 };
 
 interface BaseNodeProps extends NodeProps<NodeData> {
@@ -267,6 +274,7 @@ const getNodeTypeColor = (type: string): string => {
     case 'dataTransformNode': return 'bg-pink-500';
     case 'delayNode': return 'bg-gray-500';
     case 'endNode': return 'bg-red-500';
+    case 'realNumbersNode': return 'bg-blue-500';
     default: return 'bg-slate-500';
   }
 };
@@ -282,6 +290,7 @@ export const HttpRequestNode: React.FC<NodeProps<any>> = (props) => <BaseNode {.
 export const DataTransformNode: React.FC<NodeProps<any>> = (props) => <BaseNode {...props} />;
 export const DelayNode: React.FC<NodeProps<any>> = (props) => <BaseNode {...props} />;
 export const SwitchNode: React.FC<NodeProps<any>> = (props) => <BaseNode {...props} />;
+export const RealNumbersNode: React.FC<NodeProps<any>> = (props) => <BaseNode {...props} />;
 
 // Export a utility class for the editor
 export class CustomNodes {
@@ -297,6 +306,7 @@ export class CustomNodes {
       'dataTransformNode': DataTransformNode,
       'delayNode': DelayNode,
       'switchNode': SwitchNode,
+      'realNumbersNode': RealNumbersNode,
     };
   }
 

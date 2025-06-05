@@ -1,10 +1,10 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { NodeData, CustomNodeType, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData, LoopNodeData, HttpRequestNodeData, DataTransformNodeData, DelayNodeData, SwitchNodeData } from '../../types';
+import { NodeData, CustomNodeType, TriggerNodeData, LLMAgentNodeData, ToolActionNodeData, ConditionNodeData, EndNodeData, LoopNodeData, HttpRequestNodeData, DataTransformNodeData, DelayNodeData, SwitchNodeData, RealNumbersNodeData, StringNodeData, MathNodeData } from '../../types';
 import { NODE_TYPE_META } from '../../constants';
-import { TriggerIcon, LLMIcon, ToolIcon, ConditionIcon, EndIcon, CogIcon, LoopIcon, HttpIcon, TransformIcon, DelayIcon, SwitchIcon } from '../icons/NodeIcons';
+import { TriggerIcon, LLMIcon, ToolIcon, ConditionIcon, EndIcon, CogIcon, LoopIcon, HttpIcon, TransformIcon, DelayIcon, SwitchIcon, NumberIcon, StringIcon, MathIcon } from '../icons/NodeIcons';
 
-const iconMap: Record<CustomNodeType, React.FC<{ className?: string }>> = {
+const iconMap: Record<string, React.FC<{ className?: string }>> = {
   [CustomNodeType.TRIGGER]: TriggerIcon,
   [CustomNodeType.LLM_AGENT]: LLMIcon,
   [CustomNodeType.TOOL_ACTION]: ToolIcon,
@@ -15,6 +15,9 @@ const iconMap: Record<CustomNodeType, React.FC<{ className?: string }>> = {
   [CustomNodeType.DATA_TRANSFORM]: TransformIcon,
   [CustomNodeType.DELAY]: DelayIcon,
   [CustomNodeType.SWITCH]: SwitchIcon,
+  [CustomNodeType.REAL_NUMBERS]: NumberIcon,
+  [CustomNodeType.STRING]: StringIcon,
+  [CustomNodeType.MATH]: MathIcon,
 };
 
 interface BaseNodeProps extends NodeProps<NodeData> {
@@ -22,7 +25,7 @@ interface BaseNodeProps extends NodeProps<NodeData> {
 }
 
 const BaseNode: React.FC<BaseNodeProps> = memo(({ data, selected, type /*, children */ }) => {
-  const nodeMeta = NODE_TYPE_META[data.type];
+  const nodeMeta = NODE_TYPE_META[data.type] || { name: data.type, color: 'bg-slate-500', icon: 'CogIcon' };
   const IconComponent = iconMap[data.type] || CogIcon;
 
   return (
@@ -42,6 +45,9 @@ const BaseNode: React.FC<BaseNodeProps> = memo(({ data, selected, type /*, child
         {data.type === CustomNodeType.DATA_TRANSFORM && <p>Type: {(data as DataTransformNodeData).transformType}</p>}
         {data.type === CustomNodeType.DELAY && <p>Mode: {(data as DelayNodeData).delayType}</p>}
         {data.type === CustomNodeType.SWITCH && <p>Cases: {(data as SwitchNodeData).cases.length}</p>}
+        {data.type === CustomNodeType.REAL_NUMBERS && <p>🔢 Real Numbers: {(data as RealNumbersNodeData).minValue} - {(data as RealNumbersNodeData).maxValue}</p>}
+        {data.type === CustomNodeType.STRING && <p>📝 String: "{(data as StringNodeData).outputPrefix}..."</p>}
+        {data.type === CustomNodeType.MATH && <p>🧮 Math: {(data as MathNodeData).operandA} {(data as MathNodeData).operation} {(data as MathNodeData).operandB}</p>}
       </div>
       
       {/* Input Handle (except for Trigger) */}
@@ -135,5 +141,8 @@ export const HttpRequestNode: React.FC<NodeProps<HttpRequestNodeData>> = (props)
 export const DataTransformNode: React.FC<NodeProps<DataTransformNodeData>> = (props) => <BaseNode {...props} />;
 export const DelayNode: React.FC<NodeProps<DelayNodeData>> = (props) => <BaseNode {...props} />;
 export const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => <BaseNode {...props} />;
+export const RealNumbersNode: React.FC<NodeProps<RealNumbersNodeData>> = (props) => <BaseNode {...props} />;
+export const StringNode: React.FC<NodeProps<StringNodeData>> = (props) => <BaseNode {...props} />;
+export const MathNode: React.FC<NodeProps<MathNodeData>> = (props) => <BaseNode {...props} />;
 
     

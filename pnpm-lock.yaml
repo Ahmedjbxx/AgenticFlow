@@ -21,6 +21,9 @@ catalogs:
     '@types/node':
       specifier: ^22.14.0
       version: 22.15.29
+    jest:
+      specifier: ^29.6.2
+      version: 29.7.0
     prettier:
       specifier: ^3.0.0
       version: 3.5.3
@@ -50,6 +53,9 @@ importers:
 
   .:
     dependencies:
+      '@agenticflow/nodes':
+        specifier: workspace:*
+        version: link:packages/nodes
       '@google/genai':
         specifier: 'catalog:'
         version: 1.3.0(@modelcontextprotocol/sdk@1.12.1)
@@ -141,6 +147,8 @@ importers:
 
   packages/@agenticflow/prettier-config: {}
 
+  packages/@agenticflow/typescript-config: {}
+
   packages/config:
     dependencies:
       '@agenticflow/types':
@@ -166,14 +174,17 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
-      '@types/node':
-        specifier: ^22.14.0
-        version: 22.15.29
+      '@agenticflow/typescript-config':
+        specifier: workspace:*
+        version: link:../@agenticflow/typescript-config
+      jest:
+        specifier: 'catalog:'
+        version: 29.7.0(@types/node@22.15.29)
       rimraf:
-        specifier: ^6.0.1
-        version: 6.0.1
+        specifier: ^5.0.0
+        version: 5.0.10
       typescript:
-        specifier: ^5.7.2
+        specifier: 'catalog:'
         version: 5.7.3
 
   packages/editor:

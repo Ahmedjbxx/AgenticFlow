@@ -14,6 +14,9 @@ export enum CustomNodeType {
   DATA_TRANSFORM = 'dataTransformNode',
   DELAY = 'delayNode',
   SWITCH = 'switchNode',
+  REAL_NUMBERS = 'realNumbersNode',
+  STRING = 'stringNode',
+  MATH = 'mathNode',
 }
 
 export interface BaseNodeData {
@@ -95,4 +98,27 @@ export interface SwitchNodeData extends BaseNodeData {
   defaultCase?: boolean; // Whether to include a default case
 }
 
-export type NodeData = TriggerNodeData | LLMAgentNodeData | ToolActionNodeData | ConditionNodeData | EndNodeData | LoopNodeData | HttpRequestNodeData | DataTransformNodeData | DelayNodeData | SwitchNodeData; 
+export interface RealNumbersNodeData extends BaseNodeData {
+  type: CustomNodeType.REAL_NUMBERS;
+  minValue: number;
+  maxValue: number;
+  decimalPlaces: number;
+}
+
+export interface StringNodeData extends BaseNodeData {
+  type: CustomNodeType.STRING;
+  inputString: string;
+  outputPrefix: string;
+}
+
+export interface MathNodeData extends BaseNodeData {
+  type: CustomNodeType.MATH;
+  operation: '+' | '-' | '*' | '/';
+  operandA: number;
+  operandB: number;
+  operandAVariable?: string; // Optional variable reference
+  operandBVariable?: string; // Optional variable reference
+  useVariables: boolean; // Whether to use variables instead of fixed values
+}
+
+export type NodeData = TriggerNodeData | LLMAgentNodeData | ToolActionNodeData | ConditionNodeData | EndNodeData | LoopNodeData | HttpRequestNodeData | DataTransformNodeData | DelayNodeData | SwitchNodeData | RealNumbersNodeData | StringNodeData | MathNodeData; 

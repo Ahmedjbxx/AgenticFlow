@@ -40,7 +40,7 @@ export class HttpRequestNodePlugin extends NodePlugin<HttpRequestNodeData> {
       type: 'httpRequestNode' as any,
       label: 'HTTP Request',
       method: 'GET',
-      url: 'https://api.restful-api.dev/objects/1',
+      url: 'https://api.restful-api.dev/objects/2',
       timeout: 5000,
     };
   }

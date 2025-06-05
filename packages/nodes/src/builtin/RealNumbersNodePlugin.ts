@@ -1,22 +1,13 @@
 import React from 'react';
 import { NodePlugin, NodePluginMetadata, NodeEditorContext } from '../base/NodePlugin.js';
 import { ExecutionContext, VariableDefinition } from '@agenticflow/core';
-
-// Simple data interface for the Real Numbers Node
-interface RealNumbersNodeData {
-  id: string;
-  type: string;
-  label: string;
-  minValue: number;
-  maxValue: number;
-  decimalPlaces: number;
-}
+import { RealNumbersNodeData } from '@agenticflow/types';
 
 export class RealNumbersNodePlugin extends NodePlugin<RealNumbersNodeData> {
   readonly metadata: NodePluginMetadata = {
     type: 'realNumbersNode',
     name: 'Real Numbers',
-    description: 'Generate a random real number within specified range',
+    description: 'Create a random real number within specified range',
     version: '1.0.0',
     category: 'utility',
     icon: 'NumberIcon',
@@ -29,7 +20,7 @@ export class RealNumbersNodePlugin extends NodePlugin<RealNumbersNodeData> {
   createDefaultData(): RealNumbersNodeData {
     return {
       id: '',
-      type: 'realNumbersNode',
+      type: 'realNumbersNode' as any,
       label: 'Real Numbers',
       minValue: 0,
       maxValue: 100,

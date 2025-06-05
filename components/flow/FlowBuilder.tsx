@@ -32,6 +32,9 @@ import {
   DataTransformNode,
   DelayNode,
   SwitchNode,
+  RealNumbersNode,
+  StringNode,
+  MathNode,
 } from './CustomNodes';
 
 // Import new store and plugin system
@@ -101,6 +104,9 @@ const FlowBuilder: React.FC = () => {
       'dataTransformNode': DataTransformNode,
       'delayNode': DelayNode,
       'switchNode': SwitchNode,
+      'realNumbersNode': RealNumbersNode,
+      'stringNode': StringNode,
+      'mathNode': MathNode,
     };
   }, []);
 

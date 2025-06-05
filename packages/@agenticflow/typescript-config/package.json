@@ -1,0 +1,12 @@
+{
+  "name": "@agenticflow/typescript-config",
+  "version": "0.1.0",
+  "description": "Shared TypeScript configuration for AgenticFlow",
+  "license": "MIT",
+  "files": [
+    "*.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+} 
