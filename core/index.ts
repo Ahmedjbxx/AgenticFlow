@@ -1,17 +1,17 @@
-// Core application exports
-export { ApplicationCore, applicationCore } from './ApplicationCore';
+// Core application exports - re-export from new packages to maintain compatibility
+export { ApplicationCore, applicationCore } from '../packages/core/src/ApplicationCore';
 
 // Execution context and interfaces
-export type { ExecutionContext, Logger, EventBus, AppConfig } from './execution/ExecutionContext';
+export type { ExecutionContext, AppConfig } from './execution/ExecutionContext';
 
-// Registry system
-export { NodeRegistry } from './registry/NodeRegistry';
+// Registry system - re-export from packages for compatibility
+export { NodeRegistry } from '../packages/core/src/registry/NodeRegistry';
 
-// Event system
-export { EventBus } from './events/EventBus';
+// Event system - re-export from packages to avoid duplicates
+export { EventBus, type IEventBus } from '../packages/core/src/events/EventBus';
 
-// Logging system
-export { Logger, LogLevel, LogEntry } from './logging/Logger';
+// Logging system - re-export from packages to avoid duplicates  
+export { Logger, ConfigurableLogger, LoggerFactory, type ILogger, type LogLevel, type LogEntry } from '../packages/core/src/logging/Logger';
 
 // Base node plugin system
 export { NodePlugin, NodePluginMetadata, NodePluginRegistration } from '@agenticflow/nodes';

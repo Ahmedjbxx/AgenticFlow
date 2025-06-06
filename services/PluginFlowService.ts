@@ -121,7 +121,7 @@ export class PluginFlowService {
   /**
    * Get plugins by category
    */
-  public getPluginsByCategory(category: string): typeof this.getAvailablePlugins {
+  public getPluginsByCategory(category: string): ReturnType<typeof this.getAvailablePlugins> {
     return this.getAvailablePlugins().filter(plugin => plugin.category === category);
   }
 
@@ -177,6 +177,6 @@ export class PluginFlowService {
     return applicationCore;
   }
 }
-
+// Bridge: PluginFlowService connects old UI to new engine 
 // Export singleton instance for convenience
 export const pluginFlowService = PluginFlowService.getInstance(); 
