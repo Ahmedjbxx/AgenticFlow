@@ -3,7 +3,7 @@
  * This simulates the exact scenario the user is experiencing
  */
 
-import { applicationCore } from './core/ApplicationCore';
+import { applicationCore } from './packages/core/src/ApplicationCore';
 import { useFlowStore } from './store/flowStore';
 
 function testVariableRefreshSystem() {

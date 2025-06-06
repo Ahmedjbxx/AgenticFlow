@@ -3,7 +3,7 @@ import { CustomNode } from '../../types';
 import { XMarkIcon } from '../icons/EditorIcons';
 import { useFlowStore } from '../../store/flowStore';
 import { useVariables } from '../../hooks/useVariables';
-import { applicationCore } from '../../core/ApplicationCore';
+import { applicationCore } from '../../packages/core/src/ApplicationCore';
 
 interface NodeEditorPanelProps {
   node: CustomNode;

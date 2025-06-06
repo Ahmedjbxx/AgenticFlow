@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { CustomNode, CustomEdge, FlowData, ExecutionLogEntry, Position } from '../types';
 import { NodeRegistry } from '../core/registry/NodeRegistry';
-import { applicationCore } from '../core/ApplicationCore';
+import { applicationCore } from '../packages/core/src/ApplicationCore';
 import { AvailableVariable } from '../core/variables/VariableRegistry';
 
 // Store state interface

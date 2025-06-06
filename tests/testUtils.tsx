@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, RenderOptions, RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ApplicationCore } from '../core/ApplicationCore';
+import { ApplicationCore } from '../packages/core/src/ApplicationCore';
 import { NodeRegistry } from '../core/registry/NodeRegistry';
 import { EventBus } from '../core/events/EventBus';
 import { Logger } from '../core/logging/Logger';

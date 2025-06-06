@@ -1,4 +1,4 @@
-import { applicationCore } from '../core/ApplicationCore';
+import { applicationCore } from '../packages/core/src/ApplicationCore';
 import { registerBuiltInPlugins } from '@agenticflow/nodes';
 import { PluginBasedFlowExecutor } from '../core/execution/PluginBasedFlowExecutor';
 import { FlowData, ExecutionLogEntry } from '../types';

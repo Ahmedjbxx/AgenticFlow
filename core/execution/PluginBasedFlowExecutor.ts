@@ -1,5 +1,5 @@
 import { FlowData, CustomNode, CustomEdge, ExecutionLogEntry, NodeData, CustomNodeType } from '../../types';
-import { ApplicationCore } from '../ApplicationCore';
+import { ApplicationCore } from '../../packages/core/src/ApplicationCore';
 import { NodeRegistry } from '../registry/NodeRegistry';
 import { ExecutionContext } from './ExecutionContext';
 

@@ -46,7 +46,7 @@ import {
   useExecutionLogs,
   usePersistenceStore,
 } from '../../store';
-import { applicationCore } from '../../core/ApplicationCore';
+import { applicationCore } from '../../packages/core/src/ApplicationCore';
 
 import { PlusIcon, SaveIcon, LoadIcon, PlayIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '../icons/EditorIcons';
 import { loadLeadQualificationTemplate, loadEmailAssistantTemplate } from '../../utils/templates';

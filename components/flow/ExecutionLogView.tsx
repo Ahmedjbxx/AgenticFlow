@@ -193,7 +193,7 @@ const ExecutionLogView: React.FC<ExecutionLogViewProps> = ({ log }) => {
               title="Close Logger"
             >
               <ChevronDownIcon className="w-4 h-4" />
-            </button>
+        </button>
           )}
           
           {/* Expand indicator for hidden state */}
@@ -328,7 +328,7 @@ const ExecutionLogView: React.FC<ExecutionLogViewProps> = ({ log }) => {
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center space-x-3">
-                          <StatusIcon status={entry.status} />
+                  <StatusIcon status={entry.status} />
                           <div>
                             <div className="font-semibold text-sm">{entry.nodeLabel}</div>
                             <div className="text-xs text-slate-400">{entry.nodeId}</div>
@@ -342,13 +342,13 @@ const ExecutionLogView: React.FC<ExecutionLogViewProps> = ({ log }) => {
                             {new Date(entry.timestamp).toLocaleDateString()}
                           </div>
                         </div>
-                      </div>
+                </div>
                       
                       <p className="text-slate-300 text-sm mb-3">{entry.message}</p>
                       
                       {/* Input/Output for fullscreen state */}
                       <div className="space-y-2">
-                        {entry.input && (
+                {entry.input && (
                           <details className="group">
                             <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-300 transition-colors duration-200 flex items-center space-x-1 select-none">
                               <span>📥 Input Data</span>
@@ -359,10 +359,10 @@ const ExecutionLogView: React.FC<ExecutionLogViewProps> = ({ log }) => {
                                 {JSON.stringify(entry.input, null, 2)}
                               </pre>
                             </div>
-                          </details>
-                        )}
+                  </details>
+                )}
                         
-                        {entry.output && (
+                {entry.output && (
                           <details className="group">
                             <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-300 transition-colors duration-200 flex items-center space-x-1 select-none">
                               <span>📤 Output Data</span>
@@ -373,13 +373,13 @@ const ExecutionLogView: React.FC<ExecutionLogViewProps> = ({ log }) => {
                                 {JSON.stringify(entry.output, null, 2)}
                               </pre>
                             </div>
-                          </details>
-                        )}
+                  </details>
+                )}
                       </div>
                     </div>
                   )}
                 </div>
-              ))}
+            ))}
             </div>
           </div>
         </div>

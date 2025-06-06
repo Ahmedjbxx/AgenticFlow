@@ -241,6 +241,9 @@ importers:
       '@agenticflow/types':
         specifier: workspace:*
         version: link:../types
+      '@agenticflow/ui':
+        specifier: workspace:*
+        version: link:../ui
     devDependencies:
       '@types/jest':
         specifier: ^29.5.3

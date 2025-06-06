@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { applicationCore } from '../core/ApplicationCore';
+import { applicationCore } from '../packages/core/src/ApplicationCore';
 
 interface Props {
   children: ReactNode;
